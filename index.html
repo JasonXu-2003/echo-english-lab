@@ -265,6 +265,7 @@
     .btn:hover { transform: translateY(-2px); background: #d9d4c7; }
     .btn.primary { padding-inline: 25px; color: white; background: var(--ink); box-shadow: 0 7px 19px rgba(25,26,22,.18); }
     .btn.primary:hover { background: #35372f; }
+    .btn.primary:disabled { color: #696b62; background: #d9d5ca; box-shadow: none; cursor: default; transform: none; }
     .btn.answer { color: #872e18; background: rgba(243,111,74,.16); }
 
     .control-deck {
@@ -278,6 +279,8 @@
     .round-btn { width: 50px; height: 50px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: rgba(255,255,255,.7); transition: .2s; }
     .round-btn:hover:not(:disabled) { color: white; background: var(--ink); transform: scale(1.04); }
     .round-btn:disabled { opacity: .35; cursor: not-allowed; }
+    .round-btn.ready { color: var(--ink); border-color: var(--acid); background: var(--acid); box-shadow: 0 0 0 6px rgba(201,247,60,.18); }
+    .round-btn.ready:hover { color: var(--ink); background: #d7ff59; }
     .round-btn svg { width: 21px; }
     .shortcuts { display: flex; justify-content: center; gap: clamp(10px, 3vw, 32px); color: #777a70; font-size: 10px; }
     .shortcuts span { white-space: nowrap; }
@@ -957,13 +960,17 @@
       $("#feedbackCard").className = "feedback-card";
       $("#answerComparison").className = "answer-comparison";
       $("#checkBtn").textContent = "检查答案  ↵";
+      $("#checkBtn").disabled = false;
       $("#prevBtn").disabled = index === 0;
       $("#nextBtn").disabled = false;
+      $("#nextBtn").classList.remove("ready");
+      $("#nextBtn").title = "下一题";
+      $("#nextBtn").setAttribute("aria-label", "下一题");
       requestAnimationFrame(() => $("#answerInput").focus());
     }
 
     function checkAnswer() {
-      if (checkedCurrent) { nextQuestion(); return; }
+      if (checkedCurrent) return;
       const input = $("#answerInput").value.trim();
       if (!input) { toast("先试着说一句，哪怕不完整也没关系"); return; }
       const q = currentQuestion();
@@ -990,7 +997,12 @@
       $("#minimalLabel").textContent = isAccepted ? "你的自然表达 · 已接受" : "基于你的表达 · 最小修改";
       $("#minimalAnswer").textContent = assessment.minimal;
       $("#standardAnswer").textContent = q.en;
-      $("#checkBtn").textContent = "下一句  →";
+      $("#answerInput").disabled = true;
+      $("#checkBtn").textContent = "已检查 · 答案已固定";
+      $("#checkBtn").disabled = true;
+      $("#nextBtn").classList.add("ready");
+      $("#nextBtn").title = "查看完答案后，点击进入下一题";
+      $("#nextBtn").setAttribute("aria-label", "进入下一题");
       saveState();
       if (previousDaily + 1 === DAILY_GOAL) toast("今日 50 句达成！现在可以无限续练。", 3200);
       if (isAccepted) speak(assessment.minimal, .88);
