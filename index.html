@@ -588,7 +588,7 @@
             <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
           </button>
           <div class="shortcuts">
-            <span><kbd>Enter</kbd>检查</span><span><kbd>⌘ H</kbd>提示</span><span><kbd>⌘ J</kbd>发音</span><span><kbd>⌘ .</kbd>答案</span>
+            <span id="enterShortcut"><kbd>Enter</kbd>检查</span><span><kbd>⌘ H</kbd>提示</span><span><kbd>⌘ J</kbd>发音</span><span><kbd>⌘ .</kbd>答案</span>
           </div>
           <button class="round-btn" id="nextBtn" title="下一题" aria-label="下一题">
             <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
@@ -961,6 +961,7 @@
       $("#answerComparison").className = "answer-comparison";
       $("#checkBtn").textContent = "检查答案  ↵";
       $("#checkBtn").disabled = false;
+      $("#enterShortcut").innerHTML = "<kbd>Enter</kbd>检查";
       $("#prevBtn").disabled = index === 0;
       $("#nextBtn").disabled = false;
       $("#nextBtn").classList.remove("ready");
@@ -1000,8 +1001,9 @@
       $("#answerInput").disabled = true;
       $("#checkBtn").textContent = "已检查 · 答案已固定";
       $("#checkBtn").disabled = true;
+      $("#enterShortcut").innerHTML = "<kbd>Enter</kbd>下一题";
       $("#nextBtn").classList.add("ready");
-      $("#nextBtn").title = "查看完答案后，点击进入下一题";
+      $("#nextBtn").title = "点击或按 Enter 进入下一题";
       $("#nextBtn").setAttribute("aria-label", "进入下一题");
       saveState();
       if (previousDaily + 1 === DAILY_GOAL) toast("今日 50 句达成！现在可以无限续练。", 3200);
@@ -1212,7 +1214,11 @@
 
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && document.body.classList.contains("focus-mode")) document.body.classList.remove("focus-mode");
-      if (event.key === "Enter" && !event.shiftKey && !document.querySelector("dialog[open]")) { event.preventDefault(); checkAnswer(); }
+      if (event.key === "Enter" && !event.shiftKey && !document.querySelector("dialog[open]")) {
+        event.preventDefault();
+        if (checkedCurrent) nextQuestion();
+        else checkAnswer();
+      }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "h") { event.preventDefault(); revealHint(); }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "j") { event.preventDefault(); speak(currentQuestion().en); }
       if ((event.metaKey || event.ctrlKey) && event.key === ".") { event.preventDefault(); revealAnswer(); }

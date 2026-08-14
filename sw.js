@@ -1,4 +1,4 @@
-const CACHE = "echo-english-lab-v7";
+const CACHE = "echo-english-lab-v8";
 const ASSETS = ["./", "./index.html", "./questions.js", "./question-factory.js", "./supabase-config.js", "./cloud-sync.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {
