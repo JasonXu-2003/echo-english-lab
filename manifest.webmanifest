@@ -1,0 +1,10 @@
+{
+  "name": "Echo 英语回声训练室",
+  "short_name": "Echo English",
+  "description": "16,000+ 出国生活、校园科研与国际会议英语训练，支持账号登录与云端同步",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f3f0e8",
+  "theme_color": "#171814",
+  "lang": "zh-CN"
+}
