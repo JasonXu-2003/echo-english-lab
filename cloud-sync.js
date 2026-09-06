@@ -166,7 +166,7 @@
     if (/invalid login credentials/i.test(message)) return "邮箱或密码不正确";
     if (/email not confirmed/i.test(message)) return "请先在邮箱中完成验证";
     if (/already registered|already been registered/i.test(message)) return "该邮箱已经注册";
-    if (/failed to fetch|network/i.test(message)) return "网络连接不可用";
+    if (/failed to fetch|network|abort|timeout/i.test(message)) return "暂时连接不上云端，可继续本地练习；联网后重试同步";
     if (/echo_learning_profiles/i.test(message)) return "请先在 Supabase SQL Editor 执行建表脚本";
     return message;
   }
@@ -211,7 +211,9 @@
     if (!email || !password) return app.toast("请输入邮箱和密码");
     if (password.length < 6) return app.toast("密码至少需要 6 位");
     setStatus("syncing", "正在创建账号…");
-    const { data, error } = await client.auth.signUp({ email, password });
+    const { data, error } = await client.auth.signUp({ email, password,
+      options: { emailRedirectTo: "https://jasonxu-2003.github.io/echo-english-lab/" }
+    });
     if (error) {
       setStatus("error", friendlyError(error));
       app.toast(friendlyError(error), 3000);
@@ -246,7 +248,7 @@
     window.addEventListener("online", () => currentUser ? syncNow({ quiet: true }) : setStatus("local"));
     window.addEventListener("offline", () => setStatus("offline", "离线中，所有练习仍可使用"));
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden" && currentUser) syncNow({ quiet: true });
+      if (document.visibilityState === "visible" && currentUser) syncNow({ quiet: true });
     });
   }
 
@@ -268,6 +270,15 @@
 
     const { supabaseUrl, publishableKey } = config();
     client = window.supabase.createClient(supabaseUrl, publishableKey, {
+      global: { fetch: async (url, options = {}) => {
+        const controller = new AbortController();
+        const abort = () => controller.abort();
+        if (options.signal?.aborted) abort();
+        options.signal?.addEventListener("abort", abort, { once: true });
+        const timer = setTimeout(abort, 12000);
+        try { return await fetch(url, { ...options, signal: controller.signal }); }
+        finally { clearTimeout(timer); options.signal?.removeEventListener("abort", abort); }
+      } },
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     });
     const epoch = ++authEpoch;

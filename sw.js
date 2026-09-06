@@ -1,5 +1,6 @@
-const CACHE = "echo-english-lab-v8";
-const ASSETS = ["./", "./index.html", "./questions.js", "./question-factory.js", "./supabase-config.js", "./cloud-sync.js", "./manifest.webmanifest"];
+const CACHE = "echo-english-lab-v9";
+const ASSETS = ["./", "./index.html", "./questions.js", "./question-factory.js", "./supabase-config.js", "./cloud-sync.js", "./vendor/supabase.min.js", "./manifest.webmanifest"];
+const assetURLs = new Set(ASSETS.map(path => new URL(path, self.registration.scope).href));
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
@@ -7,19 +8,28 @@ self.addEventListener("install", event => {
 });
 
 self.addEventListener("activate", event => {
-  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key)))));
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith("echo-english-lab-") && key !== CACHE).map(key => caches.delete(key)))));
   self.clients.claim();
 });
 
 self.addEventListener("fetch", event => {
-  if (event.request.method !== "GET") return;
-  event.respondWith(fetch(event.request).then(response => {
-    const copy = response.clone();
-    caches.open(CACHE).then(cache => cache.put(event.request, copy));
-    return response;
-  }).catch(() => caches.match(event.request).then(cached => {
-    if (cached) return cached;
-    if (event.request.mode === "navigate") return caches.match("./index.html");
-    return Response.error();
-  })));
+  const url = new URL(event.request.url);
+  url.search = "";
+  // Authentication and database responses must never enter the offline cache.
+  if (event.request.method !== "GET" || !assetURLs.has(url.href)) return;
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    try {
+      const response = await fetch(event.request, { signal: controller.signal });
+      if (!response.ok) throw new Error("Asset unavailable");
+      event.waitUntil(cache.put(url.href, response.clone()));
+      return response;
+    } catch (_) {
+      return await cache.match(url.href) || new Response("暂时无法加载，请检查网络后刷新。", {
+        status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" }
+      });
+    } finally { clearTimeout(timeout); }
+  })());
 });

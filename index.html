@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#171814" />
   <meta name="description" content="Echo 英语句子主动回忆训练：中译英、跟读、错题复习和自定义题库。" />
   <title>Echo · 英语回声训练室</title>
+  <meta name="echo-release" content="2026-09-06.1" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23171814'/%3E%3Ccircle cx='32' cy='32' r='21' fill='%23c9f73c'/%3E%3Cpath d='M39 20H25v24h15v-5H31v-5h8v-5h-8v-4h8z' fill='%23171814'/%3E%3C/svg%3E" />
   <link rel="manifest" href="manifest.webmanifest" />
   <style>
@@ -661,7 +662,7 @@
 
   <script src="questions.js"></script>
   <script src="question-factory.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.min.js" integrity="sha384-l8ah+VgaWtk1mvOe9VC+OirC6qHFF4yH7l7mKRidV9MSti3E9F463bMp6ZVN4kuC" crossorigin="anonymous"></script>
+  <script src="vendor/supabase.min.js"></script>
   <script src="supabase-config.js"></script>
   <script src="cloud-sync.js"></script>
   <script>
@@ -774,8 +775,12 @@
     }
     function replaceState(nextState) {
       state = normalizeState(nextState);
+      // Cloud records are data, not a request to navigate or clear the current exercise.
+      pool = [...seedQuestions, ...state.custom];
+      state.lastIndex = Math.max(0, pool.findIndex(q => q.cn === currentQuestion().cn && q.en === currentQuestion().en));
       localStorage.setItem(storageKey, JSON.stringify(state));
-      rebuildFromState();
+      updateCounts();
+      updateProgress();
     }
     function normalize(text) {
       return text.toLowerCase().replace(/[’‘]/g, "'").replace(/[^a-z0-9' ]/g, "").replace(/\s+/g, " ").trim();
@@ -955,6 +960,7 @@
       $("#answerInput").value = "";
       $("#answerInput").style.height = document.body.classList.contains("compact-window") ? "70px" : "90px";
       $("#answerInput").disabled = false;
+      $("#answerInput").readOnly = false;
       $("#hintText").textContent = "";
       $("#wordFeedback").innerHTML = "";
       $("#feedbackCard").className = "feedback-card";
@@ -998,9 +1004,9 @@
       $("#minimalLabel").textContent = isAccepted ? "你的自然表达 · 已接受" : "基于你的表达 · 最小修改";
       $("#minimalAnswer").textContent = assessment.minimal;
       $("#standardAnswer").textContent = q.en;
-      $("#answerInput").disabled = true;
-      $("#checkBtn").textContent = "已检查 · 答案已固定";
-      $("#checkBtn").disabled = true;
+      $("#answerInput").readOnly = true;
+      $("#checkBtn").textContent = "下一题  ↵";
+      $("#hintText").textContent = "答案会保留；看完后按回车或点击下一题。";
       $("#enterShortcut").innerHTML = "<kbd>Enter</kbd>下一题";
       $("#nextBtn").classList.add("ready");
       $("#nextBtn").title = "点击或按 Enter 进入下一题";
@@ -1034,6 +1040,7 @@
 
     function revealAnswer() {
       const q = currentQuestion();
+      if (checkedCurrent) { speak(q.en, .78); return; }
       $("#answerInput").value = q.en;
       $("#hintText").textContent = "先朗读两遍，再进入下一题。";
       state.mistakes[q.en] = { cn: q.cn, en: q.en, input: "（查看答案）", count: (state.mistakes[q.en]?.count || 0) + 1 };
@@ -1045,6 +1052,7 @@
       if (index < activePool.length - 1) index++;
       else { index = 0; toast("本轮题库完成，已从第一个场景继续。", 2200); }
       renderQuestion();
+      saveState();
     }
     function previousQuestion() { if (index > 0) { index--; renderQuestion(); } }
 
@@ -1070,6 +1078,7 @@
       $("#micBtn").classList.add("listening");
       toast("正在听你说英语…");
       recognition.onresult = (event) => {
+        if (checkedCurrent) return;
         $("#answerInput").value = [...event.results].map(r => r[0].transcript).join(" ");
       };
       recognition.onend = () => $("#micBtn").classList.remove("listening");
@@ -1144,7 +1153,7 @@
       const div = document.createElement("div"); div.textContent = value; return div.innerHTML;
     }
 
-    $("#checkBtn").addEventListener("click", checkAnswer);
+    $("#checkBtn").addEventListener("click", () => checkedCurrent ? nextQuestion() : checkAnswer());
     $("#hintBtn").addEventListener("click", revealHint);
     $("#revealBtn").addEventListener("click", revealAnswer);
     $("#speakBtn").addEventListener("click", () => speak(currentQuestion().en));
@@ -1213,9 +1222,11 @@
     }));
 
     document.addEventListener("keydown", (event) => {
+      if (event.isComposing || event.keyCode === 229) return;
       if (event.key === "Escape" && document.body.classList.contains("focus-mode")) document.body.classList.remove("focus-mode");
       if (event.key === "Enter" && !event.shiftKey && !document.querySelector("dialog[open]")) {
         event.preventDefault();
+        if (event.repeat) return;
         if (checkedCurrent) nextQuestion();
         else checkAnswer();
       }
@@ -1226,12 +1237,7 @@
       if (event.key === "ArrowLeft" && document.activeElement !== $("#answerInput")) previousQuestion();
     });
 
-    let touchStartX = 0;
-    $("#workspace").addEventListener("touchstart", e => touchStartX = e.changedTouches[0].clientX, { passive: true });
-    $("#workspace").addEventListener("touchend", e => {
-      const diff = e.changedTouches[0].clientX - touchStartX;
-      if (Math.abs(diff) > 75) diff < 0 ? nextQuestion() : previousQuestion();
-    }, { passive: true });
+    // Mobile scrolling and text selection must never advance an exercise.
 
     function updateTimer() {
       const elapsed = Math.floor((Date.now() - startedAt) / 1000);
