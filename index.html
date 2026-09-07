@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#171814" />
   <meta name="description" content="Echo 英语句子主动回忆训练：中译英、跟读、错题复习和自定义题库。" />
   <title>Echo · 英语回声训练室</title>
-  <meta name="echo-release" content="2026-09-07.1" />
+  <meta name="echo-release" content="2026-09-07.2" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23171814'/%3E%3Ccircle cx='32' cy='32' r='21' fill='%23c9f73c'/%3E%3Cpath d='M39 20H25v24h15v-5H31v-5h8v-5h-8v-4h8z' fill='%23171814'/%3E%3C/svg%3E" />
   <link rel="manifest" href="manifest.webmanifest" />
   <style>
@@ -240,6 +240,9 @@
     .token { padding: 5px 7px 4px; border-radius: 6px; color: #5e6158; background: rgba(25,26,22,.06); font-family: var(--display); font-size: 16px; }
     .token.ok { background: rgba(159,200,16,.19); color: #607a02; }
     .token.bad { background: rgba(243,111,74,.15); color: #b73f20; text-decoration: line-through; }
+    .token.add { background: rgba(159,200,16,.19); color: #416003; border-bottom: 2px solid #91ad33; }
+    .review-notes { margin: 12px 0 0; padding-left: 18px; font-size: 12px; line-height: 1.65; }
+    .review-notes:empty { display: none; }
 
     .feedback-card {
       display: none; margin: 19px auto 0; padding: 14px 16px;
@@ -557,7 +560,7 @@
 
           <div class="answer-area">
             <div class="answer-wrap">
-              <textarea id="answerInput" class="answer-input" rows="2" placeholder="Type the sentence…" autocomplete="off" autocapitalize="sentences" spellcheck="false" aria-label="输入英文答案"></textarea>
+              <textarea id="answerInput" class="answer-input" rows="2" maxlength="1800" placeholder="Type the sentence…" autocomplete="off" autocapitalize="sentences" spellcheck="false" aria-label="输入英文答案"></textarea>
               <button class="mic-btn" id="micBtn" title="语音输入" aria-label="语音输入">
                 <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z"/><path d="M5 11v1a7 7 0 0 0 14 0v-1M12 19v3m-4 0h8"/></svg>
               </button>
@@ -571,6 +574,7 @@
                   <div class="answer-line"><label id="minimalLabel">基于你的表达 · 最小修改</label><p id="minimalAnswer"></p></div>
                   <div class="answer-line"><label>标准参考答案</label><p id="standardAnswer"></p></div>
                 </div>
+                <ul id="reviewNotes" class="review-notes"></ul>
               </div>
             </div>
             <p class="hint-text" id="hintText" aria-live="polite"></p>
@@ -665,6 +669,7 @@
   <script src="vendor/supabase.min.js"></script>
   <script src="supabase-config.js"></script>
   <script src="cloud-sync.js"></script>
+  <script src="review.js"></script>
   <script>
     const allQuestionSources = [...(window.ECHO_QUESTIONS || []), ...(window.ECHO_GENERATED_QUESTIONS || [])];
     const questionKeys = new Set();
@@ -687,6 +692,8 @@
     let index = Math.max(0, activePool.indexOf(lastQuestion));
     let hintsUsed = 0;
     let checkedCurrent = false;
+    let gradingTicket = 0;
+    let gradingPending = false;
     let startedAt = Date.now();
     let timerTick;
     const DAILY_GOAL = 50;
@@ -955,6 +962,8 @@
     }
 
     function renderQuestion() {
+      gradingTicket++;
+      gradingPending = false;
       const q = currentQuestion();
       checkedCurrent = false;
       hintsUsed = 0;
@@ -976,6 +985,7 @@
       $("#wordFeedback").innerHTML = "";
       $("#feedbackCard").className = "feedback-card";
       $("#answerComparison").className = "answer-comparison";
+      $("#reviewNotes").replaceChildren();
       $("#checkBtn").textContent = "检查答案  ↵";
       $("#checkBtn").disabled = false;
       $("#enterShortcut").innerHTML = "<kbd>Enter</kbd>检查";
@@ -987,13 +997,32 @@
       requestAnimationFrame(() => $("#answerInput").focus());
     }
 
-    function checkAnswer() {
-      if (checkedCurrent) return;
+    async function checkAnswer() {
+      if (checkedCurrent || gradingPending) return;
       const input = $("#answerInput").value.trim();
       if (!input) { toast("先试着说一句，哪怕不完整也没关系"); return; }
       const q = currentQuestion();
-      const assessment = assessAnswer(input, q);
+      let assessment = assessAnswer(input, q);
+      let review = null;
+      let unavailable = '';
+      const ticket = gradingTicket;
+      if (!["exact", "equivalent"].includes(assessment.grade)) {
+        gradingPending = true;
+        $("#answerInput").readOnly = true;
+        $("#checkBtn").disabled = true;
+        $("#checkBtn").textContent = "正在按你的原句批改…";
+        try {
+          review = await window.EchoCloud.reviewAnswer({input, cn:q.cn, en:q.en, context:q.context, scene:q.scene});
+          assessment = {grade:review.verdict==='correct' ? 'equivalent' : 'close', minimal:review.corrected, target:review.corrected};
+        } catch (error) {
+          unavailable = /abort|fetch|load failed|network/i.test(error.message) ? '暂时无法连接 AI 精改服务；保留你的原句供对照。' : error.message;
+        }
+        if (ticket !== gradingTicket) return;
+        gradingPending = false;
+        $("#checkBtn").disabled = false;
+      }
       const isAccepted = assessment.grade === "exact" || assessment.grade === "equivalent";
+      const unverified = !isAccepted && (!review || review.verdict==='uncertain');
       const previousDaily = state.dailyAnswers[todayKey] || 0;
       state.dailyAnswers[todayKey] = previousDaily + 1;
       state.attempts++;
@@ -1001,19 +1030,26 @@
         state.correct++;
         state.mastered[q.en] = (state.mastered[q.en] || 0) + 1;
         delete state.mistakes[q.en];
-      } else {
+      } else if (!unverified) {
         state.mistakes[q.en] = { ...q, input, count: (state.mistakes[q.en]?.count || 0) + 1 };
       }
       checkedCurrent = true;
-      showWordDiff(input, assessment.target, isAccepted);
+      if (unverified) $("#wordFeedback").textContent = "未生成可靠修改，不按参考答案逐词标错。";
+      else showWordDiff(input, assessment.minimal, isAccepted);
       const card = $("#feedbackCard");
-      card.className = `feedback-card show${isAccepted ? "" : " wrong"}`;
-      $("#feedbackIcon").textContent = isAccepted ? "✓" : "↺";
-      $("#feedbackTitle").textContent = assessment.grade === "exact" ? "表达准确，很自然" : assessment.grade === "equivalent" ? "表达正确，这样说也可以" : "暂未确认，看看参考表达";
-      $("#feedbackDetail").textContent = assessment.grade === "equivalent" ? "接受这处同义表达；保留你的用词，大小写与标点仅作书写整理。" : isAccepted ? "现在听一遍，让声音也留下记忆。" : "本地规则不能覆盖所有正确说法。以下是参考表达，不表示必须逐字照写。";
+      card.className = `feedback-card show${!isAccepted && !unverified ? " wrong" : ""}`;
+      $("#feedbackIcon").textContent = isAccepted ? "✓" : unverified ? "·" : "↺";
+      $("#feedbackTitle").textContent = isAccepted ? "表达正确，这样说也可以" : unverified ? "尚未完成个性化批改" : review.verdict==='meaning_mismatch' ? "需要调整意思，下面保留你的句式修改" : "沿着你的表达，修改这几处";
+      $("#feedbackDetail").textContent = review?.explanation || unavailable || "保留你的用词，大小写与标点仅作书写整理。";
       $("#answerComparison").className = `answer-comparison${assessment.grade === "exact" ? "" : " show"}`;
-      $("#minimalLabel").textContent = isAccepted ? "你的自然表达 · 已接受" : "相近参考表达";
-      $("#minimalAnswer").textContent = assessment.minimal;
+      $("#minimalLabel").textContent = isAccepted ? "你的自然表达 · 已接受" : unverified ? "你的原句 · 尚未精改" : "基于你的表达 · AI 最小修改";
+      $("#minimalAnswer").textContent = unverified ? input : assessment.minimal;
+      $("#reviewNotes").replaceChildren();
+      if (review && !unverified) review.edits.forEach(edit => {
+        const item = document.createElement('li');
+        item.textContent = `${edit.before || '补充'} → ${edit.after || '删去'}：${edit.reason}`;
+        $("#reviewNotes").append(item);
+      });
       $("#standardAnswer").textContent = q.en;
       $("#answerInput").readOnly = true;
       $("#checkBtn").textContent = "下一题  ↵";
@@ -1032,12 +1068,9 @@
         $("#wordFeedback").innerHTML = `<span class="token ok">✓ 同义表达与自然变体已接受</span>`;
         return;
       }
-      const answerWords = normalize(expected).split(" ");
-      const inputWords = normalize(input).split(" ");
-      $("#wordFeedback").innerHTML = answerWords.map((word, i) => {
-        const entered = inputWords[i];
-        const cls = entered === word ? "ok" : "bad";
-        return `<span class="token ${cls}">${escapeHtml(entered || "＿")} ${entered === word ? "" : `→ ${escapeHtml(word)}`}</span>`;
+      $("#wordFeedback").innerHTML = window.EchoReview.diff(input, expected).map(part => {
+        const cls = part.type==='same' ? 'ok' : part.type==='add' ? 'add' : 'bad';
+        return `<span class="token ${cls}" title="${part.type==='add' ? '补充' : part.type==='remove' ? '删去或替换' : '保留'}">${escapeHtml(part.text)}</span>`;
       }).join("");
     }
 
@@ -1051,6 +1084,7 @@
 
     function revealAnswer() {
       const q = currentQuestion();
+      if (gradingPending) return;
       if (checkedCurrent) { speak(q.en, .78); return; }
       $("#answerInput").value = q.en;
       $("#hintText").textContent = "先朗读两遍，再进入下一题。";
@@ -1089,7 +1123,7 @@
       $("#micBtn").classList.add("listening");
       toast("正在听你说英语…");
       recognition.onresult = (event) => {
-        if (checkedCurrent) return;
+        if (checkedCurrent || gradingPending) return;
         $("#answerInput").value = [...event.results].map(r => r[0].transcript).join(" ");
       };
       recognition.onend = () => $("#micBtn").classList.remove("listening");

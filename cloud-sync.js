@@ -292,5 +292,27 @@
     });
   }
 
-  window.EchoCloud = { init, scheduleSync, syncNow, mergeStates };
+  async function reviewAnswer(exercise) {
+    if (!config().aiReviewEnabled) throw new Error('AI 精改尚未配置；当前保留你的原句，标准答案仅供参考。');
+    if (!client || !currentUser) throw new Error('请先登录，再使用 AI 精改。');
+    if (!navigator.onLine) throw new Error('离线时无法生成个性化修改；联网后可重新作答。');
+    const epoch = authEpoch;
+    const {data, error} = await client.auth.getSession();
+    if (error || !data.session?.access_token) throw new Error('请重新登录后使用 AI 精改。');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 35000);
+    try {
+      const response = await fetch(`${config().supabaseUrl}/functions/v1/echo-review`, {
+        method:'POST', signal:controller.signal,
+        headers:{'Content-Type':'application/json',apikey:config().publishableKey,Authorization:`Bearer ${data.session.access_token}`},
+        body:JSON.stringify(exercise)
+      });
+      let result;
+      try { result=await response.json(); } catch (_) { throw new Error('AI 批改服务暂时不可用。'); }
+      if (!response.ok) throw new Error(result.error || 'AI 精改尚未配置或服务暂时不可用。');
+      if (epoch!==authEpoch) throw new Error('账号状态已变化，请重新作答。');
+      return window.EchoReview.validate(result);
+    } finally { clearTimeout(timer); }
+  }
+  window.EchoCloud = { init, scheduleSync, syncNow, mergeStates, reviewAnswer };
 })();
