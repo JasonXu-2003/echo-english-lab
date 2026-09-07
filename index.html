@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#171814" />
   <meta name="description" content="Echo 英语句子主动回忆训练：中译英、跟读、错题复习和自定义题库。" />
   <title>Echo · 英语回声训练室</title>
-  <meta name="echo-release" content="2026-09-06.1" />
+  <meta name="echo-release" content="2026-09-07.1" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23171814'/%3E%3Ccircle cx='32' cy='32' r='21' fill='%23c9f73c'/%3E%3Cpath d='M39 20H25v24h15v-5H31v-5h8v-5h-8v-4h8z' fill='%23171814'/%3E%3C/svg%3E" />
   <link rel="manifest" href="manifest.webmanifest" />
   <style>
@@ -699,12 +699,9 @@
       [/\bcity center\b/g, "downtown"],
       [/\bmetro station\b/g, "subway station"],
       [/\bmetro\b/g, "subway"],
-      [/\btraveling to\b/g, "flying to"],
-      [/\bgoing to vancouver\b/g, "flying to vancouver"],
       [/\bbathroom\b/g, "restroom"],
       [/\btoilet\b/g, "restroom"],
       [/\bluggage\b/g, "baggage"],
-      [/\bsuitcase\b/g, "bag"],
       [/\btakeaway\b/g, "to go"],
       [/\btakeout\b/g, "to go"],
       [/\bthe check\b/g, "the bill"],
@@ -720,7 +717,6 @@
       [/\bcould you\b/g, "can you"],
       [/\bwould you\b/g, "can you"],
       [/\bi would like\b/g, "i want"],
-      [/\bi would prefer\b/g, "i want"],
       [/\bplease\b/g, ""]
     ];
 
@@ -786,6 +782,7 @@
       return text.toLowerCase().replace(/[’‘]/g, "'").replace(/[^a-z0-9' ]/g, "").replace(/\s+/g, " ").trim();
     }
     function expandContractions(text) {
+      text = text.replace(/[’‘]/g, "'");
       const replacements = [
         [/\bi'm\b/gi, "i am"], [/\bi'd\b/gi, "i would"], [/\bi'll\b/gi, "i will"],
         [/\bit's\b/gi, "it is"], [/\bthat's\b/gi, "that is"], [/\bthere's\b/gi, "there is"],
@@ -915,9 +912,22 @@
     function polishSentence(text, fallback) {
       let value = text.trim().replace(/\s+([,.!?])/g, "$1").replace(/\s+/g, " ");
       if (!value) return fallback;
+      value = value.replace(/\bi\b/g, "I");
       value = value[0].toUpperCase() + value.slice(1);
       if (!/[.!?]$/.test(value)) value += /\?$/.test(fallback) ? "?" : ".";
       return value;
+    }
+    function splitAcknowledgement(text) {
+      // Only a standalone positive reply, never adjective phrases such as "great weather".
+      const match = text.trim().match(/^(okay|ok|all right|alright|great|sounds good|sure|of course|absolutely|certainly|yes)(?:\s*[,!.]\s*|\s+(?=(?:what|when|where|how|should|can|could|would|may|I|we|here)\b)|$)/i);
+      return match ? { opener: match[1], rest: text.trim().slice(match[0].length) } : null;
+    }
+    function equivalentAnswer(input, candidate) {
+      if (canonical(input) === canonical(candidate)) return true;
+      const a = splitAcknowledgement(input);
+      const b = splitAcknowledgement(candidate);
+      // Require an acknowledgement in both: do not silently remove a missing "yes".
+      return Boolean(a && b && canonical(a.rest) === canonical(b.rest));
     }
     function assessAnswer(input, question) {
       const candidates = [question.en, ...(question.alts || [])];
@@ -925,8 +935,9 @@
       if (exact) return { grade: "exact", score: 1, target: exact, minimal: polishSentence(input, exact) };
       const ranked = candidates.map(candidate => ({ candidate, score: tokenSimilarity(input, candidate) })).sort((a, b) => b.score - a.score);
       const best = ranked[0];
-      const sameMeaning = candidates.some(candidate => canonical(input) === canonical(candidate));
-      if (sameMeaning || best.score >= .84) return { grade: "equivalent", score: best.score, target: best.candidate, minimal: polishSentence(input, best.candidate) };
+      const equivalent = candidates.find(candidate => equivalentAnswer(input, candidate));
+      if (equivalent) return { grade: "equivalent", score: 1, target: equivalent, minimal: polishSentence(input, equivalent) };
+      // Similarity selects a reference, but cannot prove meaning or grammatical correctness.
       return { grade: best.score >= .61 ? "close" : "wrong", score: best.score, target: best.candidate, minimal: best.candidate };
     }
     function currentQuestion() { return activePool[index] || pool[0]; }
@@ -998,10 +1009,10 @@
       const card = $("#feedbackCard");
       card.className = `feedback-card show${isAccepted ? "" : " wrong"}`;
       $("#feedbackIcon").textContent = isAccepted ? "✓" : "↺";
-      $("#feedbackTitle").textContent = assessment.grade === "exact" ? "表达准确，很自然" : assessment.grade === "equivalent" ? "这个说法也成立" : assessment.grade === "close" ? "意思到了，微调一下更自然" : "换一个结构会更清楚";
-      $("#feedbackDetail").textContent = assessment.grade === "equivalent" ? "检测到同义词或自然变体，不按固定答案扣分。" : isAccepted ? "现在听一遍，让声音也留下记忆。" : "下面先尽量保留你的句式修正，再给出标准答案。";
+      $("#feedbackTitle").textContent = assessment.grade === "exact" ? "表达准确，很自然" : assessment.grade === "equivalent" ? "表达正确，这样说也可以" : "暂未确认，看看参考表达";
+      $("#feedbackDetail").textContent = assessment.grade === "equivalent" ? "接受这处同义表达；保留你的用词，大小写与标点仅作书写整理。" : isAccepted ? "现在听一遍，让声音也留下记忆。" : "本地规则不能覆盖所有正确说法。以下是参考表达，不表示必须逐字照写。";
       $("#answerComparison").className = `answer-comparison${assessment.grade === "exact" ? "" : " show"}`;
-      $("#minimalLabel").textContent = isAccepted ? "你的自然表达 · 已接受" : "基于你的表达 · 最小修改";
+      $("#minimalLabel").textContent = isAccepted ? "你的自然表达 · 已接受" : "相近参考表达";
       $("#minimalAnswer").textContent = assessment.minimal;
       $("#standardAnswer").textContent = q.en;
       $("#answerInput").readOnly = true;
