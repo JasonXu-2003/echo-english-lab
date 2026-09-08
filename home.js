@@ -30,6 +30,7 @@
   const name=()=>String(app.get().profile?.displayName||identity().name||identity().email?.split('@')[0]||'学习者').slice(0,24);
   function route(view) {const url=new URL(location.href);url.searchParams.set('view',view);history.replaceState(null,'',url);}
   function show() {
+    window.EchoLife?.close();
     window.EchoVocab?.close();
     if(!shown)header=[document.querySelector('#courseTitle').textContent,document.querySelector('#courseEyebrow').textContent];
     shown=true;root.hidden=false;document.body.classList.add('home-open');route('home');
@@ -43,7 +44,7 @@
     document.querySelector('#homeNav').classList.remove('active');
     if(header){document.querySelector('#courseTitle').textContent=header[0];document.querySelector('#courseEyebrow').textContent=header[1];}
   }
-  function render() {
+  function renderContent() {
     if(!shown)return;
     const state=app.get(),today=dayKey(),s=dayStats(state,today),goal=[10,20,30,50].includes(state.vocabulary?.preferences?.goal)?state.vocabulary.preferences.goal:20;
     const now=parseDay(today),dateText=now.toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'long'});
@@ -64,6 +65,7 @@
       <section class="h-calendar-section"><div class="h-section-title"><div><p class="h-eyebrow">YOUR LEARNING DAYS</p><h2>把坚持，看得见。</h2></div><span>本月学习 ${activeDays} 天</span></div><div class="h-calendar-layout"><div class="h-calendar"><div class="h-month-nav"><button data-home-action="prev" aria-label="上个月">‹</button><h3>${year} 年 ${m} 月</h3><button data-home-action="next" aria-label="下个月" ${month>=today.slice(0,7)?'disabled':''}>›</button><button class="h-back-today" data-home-action="today">今天</button></div><div class="h-weekdays" aria-hidden="true">${['一','二','三','四','五','六','日'].map(d=>`<span>${d}</span>`).join('')}</div><div class="h-days" aria-label="学习日历">${cells}</div><div class="h-calendar-legend"><span><i></i>有学习记录</span><small>点击日期看明细 · 深色表示更多练习</small></div></div><aside class="h-day-detail" aria-live="polite"><span class="h-eyebrow">${selected===today?'TODAY / 今天':'DAY REVIEW / 当日回顾'}</span><h3>${esc(parseDay(selected).toLocaleDateString('zh-CN',{month:'long',day:'numeric'}))}</h3><p>${picked.active?'每一次回忆，都是一次积累。':selected===today?'今天的这一格，等你点亮。':'这一天没有记录到学习。'}</p><dl><div><dt>学过单词</dt><dd>${picked.words}<small> 词</small></dd></div><div><dt>其中：新词 / 复习</dt><dd>${picked.newWords} / ${picked.reviewWords}</dd></div><div><dt>句子练习</dt><dd>${picked.sentences}<small> 次</small></dd></div></dl><div class="h-month-total">本月累计 ${monthWords} 词次 · ${monthSentences} 次句子练习<br><small>单词按每日去重后相加，跨日会重复计数。</small></div></aside></div></section>
       <details class="h-explainer"><summary>统计怎样计算？</summary><p>单词完成“忘记／模糊／记住”评价后计入当日，拼写检查错误也计入学习；同一词当天只算一个“学过的词”。新词与复习可能重叠，不能直接相加。句子按提交“检查答案”的次数计数，包括重复练习、语音输入和未完成 AI 精改的提交，不等同于正确句数。只打开页面、查看未评价的单词或修改昵称不会点亮日历。</p><p>新记录按设备本地日期统计。旧版句子记录使用 UTC 日期且没有逐次时间戳，因此沿用原日期，不推算或编造历史时间。不同设备同时练句子的旧版同步策略为每日计数取较大值，可能少计并发练习。连续天数同时计入背词和句子练习；今天尚未学习时保留截至昨天的连续记录。未登录时只显示本机记录，登录后使用该账号同步的数据。</p></details>`;
   }
+  function render() {renderContent();if(shown)window.EchoLife?.decorateHome();}
   function refresh(reset=false) {
     if(reset){dialog?.close();selected=dayKey();month=selected.slice(0,7);}
     render();

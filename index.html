@@ -6,9 +6,10 @@
   <meta name="theme-color" content="#171814" />
   <meta name="description" content="Echo 英语句子主动回忆训练：中译英、跟读、错题复习和自定义题库。" />
   <title>Echo · 英语回声训练室</title>
-  <meta name="echo-release" content="2026-09-08.4" />
+  <meta name="echo-release" content="2026-09-08.5" />
   <link rel="stylesheet" href="vocabulary.css?release=2026-09-08.3" />
   <link rel="stylesheet" href="home.css?release=2026-09-08.4" />
+  <link rel="stylesheet" href="daily-life.css?release=2026-09-08.5" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23171814'/%3E%3Ccircle cx='32' cy='32' r='21' fill='%23c9f73c'/%3E%3Cpath d='M39 20H25v24h15v-5H31v-5h8v-5h-8v-4h8z' fill='%23171814'/%3E%3C/svg%3E" />
   <link rel="manifest" href="manifest.webmanifest" />
   <style>
@@ -454,6 +455,7 @@
           <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 4h7l2 2 2-2h7v16h-7l-2 2-2-2H3zM12 6v16M6 9h3m-3 4h3m6-4h3m-3 4h3"/></svg>
           <span>背单词</span><em>IELTS</em>
         </button>
+        <button class="nav-button" id="lifeNav" title="日常生活英语" aria-label="日常生活英语"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 9h14v5a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5zM17 10h2a3 3 0 0 1 0 6h-3M6 3v3m5-3v3M2 22h18"/></svg><span>日常生活英语</span><em>NEW</em></button>
         <button class="nav-button" data-view="review" title="错题回声">
           <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 3-6.25L4 8m0-5v5h5"/><path d="M12 8v5l3 2"/></svg>
           <span>错题回声</span><em id="mistakeCount">0</em>
@@ -564,6 +566,7 @@
           </div>
           <p class="prompt-cn" id="promptCn">我来这里度假，会待十天。</p>
           <span class="grammar-tag" id="grammarTag">入境回答 · 旅行目的</span>
+          <div id="lifeWordHelp" hidden></div>
 
           <div class="answer-area">
             <div class="answer-wrap">
@@ -608,6 +611,7 @@
         </footer>
       </section>
       <section id="homeView" aria-label="学习主页" hidden></section>
+      <section id="lifeView" aria-label="日常生活英语" hidden></section>
       <section id="vocabView" aria-label="雅思词汇学习" hidden></section>
     </main>
   </div>
@@ -675,16 +679,18 @@
 
   <script src="questions.js"></script>
   <script src="question-factory.js"></script>
+  <script src="daily-life-data.js?release=2026-09-08.5"></script>
   <script src="vendor/supabase.min.js"></script>
   <script src="supabase-config.js"></script>
   <script src="cloud-sync.js?release=2026-09-08.4"></script>
   <script src="review.js"></script>
   <script src="vocabulary-data.js"></script>
   <script src="vocabulary-expanded.js?release=2026-09-08.2"></script>
-  <script src="vocabulary.js?release=2026-09-08.4"></script>
-  <script src="home.js?release=2026-09-08.4"></script>
+  <script src="vocabulary.js?release=2026-09-08.5"></script>
+  <script src="home.js?release=2026-09-08.5"></script>
+  <script src="daily-life.js?release=2026-09-08.5"></script>
   <script>
-    const allQuestionSources = [...(window.ECHO_QUESTIONS || []), ...(window.ECHO_GENERATED_QUESTIONS || [])];
+    const allQuestionSources = [...(window.ECHO_QUESTIONS || []), ...(window.ECHO_GENERATED_QUESTIONS || []), ...(window.ECHO_DAILY_LIFE?.questions || [])];
     const questionKeys = new Set();
     const seedQuestions = allQuestionSources.filter(question => {
       const key = `${question.cn}|||${question.en}`;
@@ -851,7 +857,7 @@
     function buildDailyPool(allQuestions) {
       const curated = allQuestions.filter(question => !question.generated);
       const generated = allQuestions.filter(question => question.generated);
-      const categoryOrder = ["机场通关", "交通问路", "酒店住宿", "餐厅点餐", "购物生活", "医疗求助", "社交交流", "生活服务", "住房邻里", "校园交流", "科研沟通", "学术会议", "自定义题库"];
+      const categoryOrder = ["机场通关", "交通问路", "酒店住宿", "餐厅点餐", "购物生活", "医疗求助", "社交交流", "生活服务", "住房邻里", "校园交流", "科研沟通", "学术会议", "日常生活英语", "自定义题库"];
 
       const blocks = [];
       let currentBlock = null;
@@ -987,6 +993,7 @@
       hintsUsed = 0;
       $("#promptCn").textContent = q.cn;
       $("#grammarTag").textContent = q.tag || "自定义 · 主动回忆";
+      window.EchoLife?.renderHints(q);
       $("#categoryText").textContent = q.category || "自定义题库";
       $("#questionBadge").textContent = String(index + 1).padStart(2, "0");
       $("#sceneLabel").textContent = q.scene || "自定义场景";
@@ -1012,7 +1019,7 @@
       $("#nextBtn").classList.remove("ready");
       $("#nextBtn").title = "下一题";
       $("#nextBtn").setAttribute("aria-label", "下一题");
-      requestAnimationFrame(() => { if(!document.body.classList.contains('home-open')&&!document.body.classList.contains('vocabulary-open')) $("#answerInput").focus(); });
+      requestAnimationFrame(() => { if(!document.body.classList.contains('home-open')&&!document.body.classList.contains('vocabulary-open')&&!document.body.classList.contains('life-open')) $("#answerInput").focus(); });
     }
 
     async function checkAnswer() {
@@ -1154,7 +1161,8 @@
       if (!newPool.length) { toast("这里还没有题目，先完成几道练习吧"); return; }
       window.EchoVocab?.close();
       window.EchoHome?.close();
-      const routeURL=new URL(location.href);routeURL.searchParams.set('view','practice');history.replaceState(null,'',routeURL);
+      window.EchoLife?.close();
+      const routeURL=new URL(location.href);routeURL.searchParams.set('view','practice');routeURL.searchParams.delete('life');history.replaceState(null,'',routeURL);
       activePool = newPool;
       index = 0;
       $("#courseTitle").textContent = title;
@@ -1249,7 +1257,7 @@
       event.preventDefault();
       const item = { cn: $("#customCn").value.trim(), en: $("#customEn").value.trim(), alts: [], category: "自定义题库", scene: "我的旅行场景", speaker: "Context", context: "Respond naturally in this situation.", tag: $("#customTag").value.trim() || "自定义 · 主动回忆" };
       state.custom.push(item); pool = [...seedQuestions, ...state.custom]; activePool = buildDailyPool(pool); index = activePool.indexOf(item);
-      window.EchoVocab?.close();window.EchoHome?.close();saveState(); event.target.reset(); $("#customDialog").close(); renderQuestion(); toast("已加入题库");
+      window.EchoVocab?.close();window.EchoHome?.close();window.EchoLife?.close();saveState(); event.target.reset(); $("#customDialog").close(); renderQuestion(); toast("已加入题库");
     });
 
     $("#resetBtn").addEventListener("click", () => {
@@ -1284,12 +1292,14 @@
     $$('[data-view="speak"]').forEach(btn => btn.addEventListener("click", () => {
       window.EchoVocab?.close();
       window.EchoHome?.close();
+      window.EchoLife?.close();
       speak(currentQuestion().en, .72); startRecognition();
     }));
 
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && document.body.classList.contains("focus-mode")) document.body.classList.remove("focus-mode");
       if (document.body.classList.contains("home-open")) return;
+      if (document.body.classList.contains("life-open")) return;
       if (document.body.classList.contains("vocabulary-open")) return;
       if (event.isComposing || event.keyCode === 229) return;
       if (event.key === "Enter" && !event.shiftKey && !document.querySelector("dialog[open]")) {
@@ -1316,6 +1326,7 @@
     updateCounts(); renderQuestion(); updateTimer();
     window.EchoVocab?.init({get:()=>state.vocabulary||{},set:value=>{state.vocabulary=value;saveState();},toast});
     window.EchoHome.init({get:()=>state,setProfile:profile=>{state.profile=profile;saveState();}});
+    window.EchoLife.init({start:switchPool,speak});
     window.EchoCloud?.init({
       getState: () => JSON.parse(JSON.stringify(state)),
       replaceState,

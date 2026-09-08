@@ -57,6 +57,7 @@
   const selectors=()=>`<label>层级<select id="vLevel">${['全部层级',...(book.levels||[])].map(t=>`<option ${t===level?'selected':''}>${escape(t)}</option>`).join('')}</select></label><label>主题<select id="vTopic">${['全部主题',...book.topics].map(t=>`<option ${t===topic?'selected':''}>${escape(t)}</option>`).join('')}</select></label><label>学习方式<select id="vMode"><option value="recall" ${mode==='recall'?'selected':''}>看词回忆</option><option value="spell" ${mode==='spell'?'selected':''}>中译英拼写</option></select></label>`;
   function save(d) {app.set(d);}
   function show() {
+    window.EchoLife?.close();
     window.EchoHome?.close();
     if(!shown) oldHeader=[$('courseTitle').textContent,$('courseEyebrow').textContent];
     shown=true;document.body.classList.add('vocabulary-open');root.hidden=false;
