@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#171814" />
   <meta name="description" content="Echo 英语句子主动回忆训练：中译英、跟读、错题复习和自定义题库。" />
   <title>Echo · 英语回声训练室</title>
-  <meta name="echo-release" content="2026-09-08.1" />
-  <link rel="stylesheet" href="vocabulary.css" />
+  <meta name="echo-release" content="2026-09-08.2" />
+  <link rel="stylesheet" href="vocabulary.css?release=2026-09-08.2" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23171814'/%3E%3Ccircle cx='32' cy='32' r='21' fill='%23c9f73c'/%3E%3Cpath d='M39 20H25v24h15v-5H31v-5h8v-5h-8v-4h8z' fill='%23171814'/%3E%3C/svg%3E" />
   <link rel="manifest" href="manifest.webmanifest" />
   <style>
@@ -448,7 +448,7 @@
           <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 2v4m8-4v4M8 10h8m-8 4h5"/></svg>
           <span>今日训练</span><em id="dailyCount">50/日</em>
         </button>
-        <button class="nav-button" id="vocabNav" title="背单词 · 雅思核心词汇" aria-label="背单词 · 雅思核心词汇">
+        <button class="nav-button" id="vocabNav" title="背单词 · 雅思备考 5000 词" aria-label="背单词 · 雅思备考 5000 词">
           <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 4h7l2 2 2-2h7v16h-7l-2 2-2-2H3zM12 6v16M6 9h3m-3 4h3m6-4h3m-3 4h3"/></svg>
           <span>背单词</span><em>IELTS</em>
         </button>
@@ -677,7 +677,8 @@
   <script src="cloud-sync.js"></script>
   <script src="review.js"></script>
   <script src="vocabulary-data.js"></script>
-  <script src="vocabulary.js"></script>
+  <script src="vocabulary-expanded.js?release=2026-09-08.2"></script>
+  <script src="vocabulary.js?release=2026-09-08.2"></script>
   <script>
     const allQuestionSources = [...(window.ECHO_QUESTIONS || []), ...(window.ECHO_GENERATED_QUESTIONS || [])];
     const questionKeys = new Set();

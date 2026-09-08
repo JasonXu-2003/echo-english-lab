@@ -1,0 +1,47 @@
+{
+  "total": 5000,
+  "originalPreserved": 240,
+  "added": 4760,
+  "levels": {
+    "基础": 2338,
+    "核心": 2176,
+    "进阶": 486
+  },
+  "topics": {
+    "时间与空间": 58,
+    "连接与指代": 133,
+    "动作与过程": 523,
+    "描述与评价": 871,
+    "自然与地理": 163,
+    "运动与休闲": 42,
+    "日常表达": 2197,
+    "工作与经济": 111,
+    "数据与趋势": 59,
+    "社会与城市": 82,
+    "教育与校园": 62,
+    "人际与情绪": 81,
+    "住房与家居": 44,
+    "会议与合作": 47,
+    "食物与购物": 94,
+    "出行与住宿": 75,
+    "文化与媒体": 87,
+    "研究与论证": 64,
+    "科技与创新": 63,
+    "健康与医疗": 91,
+    "环境与生态": 33,
+    "论述与表达": 20
+  },
+  "ieltsTaggedAdded": 2894,
+  "uniqueImportedExamples": 4511,
+  "editorialCorrections": 8,
+  "maximumWordsPerExample": 4,
+  "sources": {
+    "ecdict.csv": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "cmn-eng.zip": "d606361aa7312dcdfb15ef4fc51cb1e7ed8bc2dc608a7b192626cd36e8403106",
+    "ECDICT-LICENSE": "f8552dd246f61a4e064569eae6194a01c6b3d63b03bf27c6ca863593c549ed0f",
+    "eng.tsv.bz2": "db035e9dbe35d6fe86410bbf16dd3ce735a3d4b74f92b4ee5482bba11cb970bc",
+    "cmn.tsv.bz2": "50e966ec563aebff2af0629e6a127cf41ad2b0a71801336086ec1e7a318bb082",
+    "links.tar.bz2": "e1373309974bf688236b8df45c3aa2f6bbb3ea2b558c6e99c1f911bbd0ef5480"
+  },
+  "selection": "ECDICT exam-tagged/common lemma with a credited bilingual example. IELTS tag prioritized, then general corpus rank. Levels and topics are heuristic study groupings, not CEFR or official IELTS lists."
+}

@@ -38,11 +38,13 @@
   const spelling=s=>s.toLowerCase().trim().replace(/[’‘]/g,"'").replace(/\s+/g,' ');
   const correctSpelling=(s,w)=>[w.word,...w.aliases].some(x=>spelling(x)===spelling(s));
   let app,root,book,screen='home',queue=[],cursor=0,current=null,revealed=false,rated=false,spellChecked=false,spellCorrect=false;
-  let mode='recall',topic='全部主题',filter='all',search='',libraryLimit=40,oldHeader=null,shown=false;
+  let mode='recall',topic='全部主题',level='全部层级',filter='all',search='',libraryLimit=40,oldHeader=null,shown=false;
   const $=id=>document.getElementById(id);
   const data=()=>merge(app.get());
   const changeId=()=>crypto.randomUUID();
-  const words=()=>book.words.filter(w=>topic==='全部主题'||w.topic===topic);
+  const words=()=>book.words.filter(w=>(topic==='全部主题'||w.topic===topic)&&(level==='全部层级'||w.level===level));
+  const shortMeaning=w=>w.meaning.length>100?w.meaning.split(/[；，]/).slice(0,5).join('；'):w.meaning;
+  const credit=w=>w.attribution?`<details class="v-source"><summary>例句来源与署名</summary><p>${escape(w.attribution)}</p><a href="https://tatoeba.org/en/sentences/show/${escape(w.exampleId)}" target="_blank" rel="noopener">英文原句</a> · <a href="https://tatoeba.org/en/sentences/show/${escape(w.translationId)}" target="_blank" rel="noopener">中文原句</a> · <a href="https://creativecommons.org/licenses/by/2.0/fr/" target="_blank" rel="noopener">CC BY 2.0 FR</a><p>释义：ECDICT（MIT）。例句片段从原句截取，不代表固定搭配。社区例句可能存在不自然表达或译义偏差。</p></details>`:'';
   const stats=()=>{
     const d=data(),today=Object.values(d.days[dayKey()]||{}),now=Date.now();
     return {d,newToday:today.filter(v=>v.new).length,reviewToday:today.filter(v=>v.review).length,
@@ -51,7 +53,7 @@
       stars:book.words.filter(w=>d.stars[w.id]?.value).length,goal:[10,20,30,50].includes(d.preferences.goal)?d.preferences.goal:20};
   };
   const btn=(action,text,cls='')=>`<button type="button" class="v-btn ${cls}" data-v-action="${action}">${text}</button>`;
-  const selectors=()=>`<label>主题<select id="vTopic">${['全部主题',...book.topics].map(t=>`<option ${t===topic?'selected':''}>${escape(t)}</option>`).join('')}</select></label><label>学习方式<select id="vMode"><option value="recall" ${mode==='recall'?'selected':''}>看词回忆</option><option value="spell" ${mode==='spell'?'selected':''}>中译英拼写</option></select></label>`;
+  const selectors=()=>`<label>层级<select id="vLevel">${['全部层级',...(book.levels||[])].map(t=>`<option ${t===level?'selected':''}>${escape(t)}</option>`).join('')}</select></label><label>主题<select id="vTopic">${['全部主题',...book.topics].map(t=>`<option ${t===topic?'selected':''}>${escape(t)}</option>`).join('')}</select></label><label>学习方式<select id="vMode"><option value="recall" ${mode==='recall'?'selected':''}>看词回忆</option><option value="spell" ${mode==='spell'?'selected':''}>中译英拼写</option></select></label>`;
   function save(d) {app.set(d);}
   function show() {
     if(!shown) oldHeader=[$('courseTitle').textContent,$('courseEyebrow').textContent];
@@ -70,10 +72,10 @@
   }
   function renderHome() {
     screen='home';current=null;const s=stats();
-    root.innerHTML=`<div class="v-hero"><div class="v-book"><span class="v-book-edition">ECHO / WORD COLLECTION 01</span><strong>IELTS<span>雅思核心词汇</span></strong><div class="v-book-lines"></div><footer><b>${book.words.length}</b> WORDS · 12 TOPICS</footer></div><div class="v-intro"><div class="v-kicker">少一点机械重复，多一次主动回忆。</div><h2>从认识，<br>到真正记得。</h2><p>看单词，想意思；放进例句，再亲手拼一次。<br>不熟的词会回来，记住的词慢一点再见。</p><div class="v-actions">${btn('start','开始今日学习 <span>↗</span>','v-primary')}${btn('due',`到期复习 · ${s.due}`)}</div><p class="v-footnote">每日目标不是上限 · 完成后仍可继续学习</p></div></div>
+    root.innerHTML=`<div class="v-hero"><div class="v-book"><span class="v-book-edition">ECHO / WORD COLLECTION 01</span><strong>IELTS<span>雅思备考词库</span></strong><div class="v-book-lines"></div><footer><b>${book.words.length.toLocaleString()}</b> WORDS · ${book.topics.length} TOPICS</footer></div><div class="v-intro"><div class="v-kicker">少一点机械重复，多一次主动回忆。</div><h2>从认识，<br>到真正记得。</h2><p>看单词，想意思；放进例句，再亲手拼一次。<br>不熟的词会回来，记住的词慢一点再见。</p><div class="v-actions">${btn('start','开始今日学习 <span>↗</span>','v-primary')}${btn('due',`到期复习 · ${s.due}`)}</div><p class="v-footnote">每日目标不是上限 · 完成后仍可继续学习</p></div></div>
       <div class="v-metrics"><div><b>${s.newToday}<small> / ${s.goal}</small></b><span>今日新词</span></div><div><b>${s.reviewToday}</b><span>今日已复习</span></div><div><b>${s.seen}<small> / ${book.words.length}</small></b><span>累计学习</span></div><div><b>${s.mastered}</b><span>稳固记忆</span></div></div>
-      <div class="v-controls">${selectors()}<label>每日新词<select id="vGoal">${[10,20,30,50].map(n=>`<option value="${n}" ${n===s.goal?'selected':''}>${n} 词</option>`).join('')}</select></label></div>
-      <div class="v-book-footer"><div><h3>你的第一本词汇书</h3><p>${escape(book.note)}</p><p>英国／美国拼写变体均可接受。发音使用设备系统语音，无需 Gemini。</p></div><div class="v-actions">${btn('library','浏览词书')}${btn('stars',`生词本 · ${s.stars}`)}</div></div>
+      <div class="v-level-summary">${(book.levels||[]).map(l=>`<span><b>${escape(l)}</b> ${book.words.filter(w=>w.level===l).length.toLocaleString()} 词</span>`).join('')}<small>筛选范围：${words().length.toLocaleString()} 词 · 今日目标跨层级累计</small></div><div class="v-controls">${selectors()}<label>每日新词<select id="vGoal">${[10,20,30,50].map(n=>`<option value="${n}" ${n===s.goal?'selected':''}>${n} 词</option>`).join('')}</select></label></div>
+      <div class="v-book-footer"><div><h3>雅思备考 · 分层学习</h3><p>${escape(book.note)}</p><p>已收录的英美拼写变体均可接受。发音使用设备系统语音，无需 Gemini。</p><p><a href="./vocabulary-sources.html" target="_blank" rel="noopener">词库来源、许可与选词说明 ↗</a></p></div><div class="v-actions">${btn('library','浏览词书')}${btn('stars',`生词本 · ${s.stars}`)}</div></div>
       <details class="v-method"><summary>复习怎样安排？</summary><p>“忘记”约 10 分钟后再见，“模糊”次日复习，“记住”在到期复习答对后依次延长为 1、3、7、14、30 天。提前加练不会反复推迟复习；至少 4 次有效记忆轮次才计入稳固记忆。这是简化的间隔复习规则，不保证永久记住。今日统计按本机日期、去重词数计算。</p><p>登录后与句子记录一起同步；同一词在多设备上同时复习时，以时间较新的记录为准，请保持设备时间准确。</p></details>`;
   }
   function start(kind='start') {
@@ -94,11 +96,11 @@
   function renderCard() {
     const w=current,s=stats(),star=Boolean(s.d.stars[w.id]?.value);
     root.innerHTML=`<div class="v-study-top">${btn('home','← 词汇书')}<span>${mode==='spell'?'中译英拼写':'看词回忆'} · ${cursor+1} / ${queue.length}</span>${btn('star',star?'★ 已加入生词本':'☆ 加入生词本')}</div>
-      <article class="v-card"><div class="v-kicker">${escape(w.topic)} · ${s.d.cards[w.id]?'复习词':'新词'}</div>
-      ${mode==='recall'?`<h2 class="v-word">${escape(w.word)}</h2><div class="v-audio">${btn('us','美音 ▷')}${btn('uk','英音 ▷')}<span>设备系统朗读</span></div>`:`<h2 class="v-meaning-prompt">${escape(w.meaning)}</h2><p class="v-pos">${escape(w.pos)} · ${w.word.length} 个字母</p><form id="vSpellForm"><label class="v-sr" for="vSpell">拼写英文单词</label><input id="vSpell" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="80" placeholder="在这里拼出英文单词…" ${spellChecked?'readonly':''}><button type="submit" class="v-btn v-primary" ${spellChecked?'disabled':''}>检查拼写 ↵</button></form>`}
-      <div id="vAnswer" ${revealed?'':'hidden'}><p class="v-definition">${mode==='spell'?`<strong>${escape(w.word)}</strong> · `:''}<span>${escape(w.pos)}</span> ${escape(w.meaning)}</p>
+      <article class="v-card"><div class="v-kicker">${escape(w.topic)} · ${escape(w.level||'核心')} · ${s.d.cards[w.id]?'复习词':'新词'}</div>
+      ${mode==='recall'?`<h2 class="v-word">${escape(w.word)}</h2>${w.phonetic?`<p class="v-phonetic">/${escape(w.phonetic)}/ <small>词典音标</small></p>`:''}<div class="v-audio">${btn('us','美音 ▷')}${btn('uk','英音 ▷')}<span>设备系统朗读</span></div>`:`<h2 class="v-meaning-prompt">${escape(shortMeaning(w))}</h2><p class="v-pos">${escape(w.pos)} · ${w.word.length} 个字母</p><form id="vSpellForm"><label class="v-sr" for="vSpell">拼写英文单词</label><input id="vSpell" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="80" placeholder="在这里拼出英文单词…" ${spellChecked?'readonly':''}><button type="submit" class="v-btn v-primary" ${spellChecked?'disabled':''}>检查拼写 ↵</button></form>`}
+      <div id="vAnswer" ${revealed?'':'hidden'}><p class="v-definition">${mode==='spell'?`<strong>${escape(w.word)}</strong> · `:''}<span>${escape(w.pos)}</span> ${escape(shortMeaning(w))}</p>${w.meaning.length>100?`<details class="v-source"><summary>查看完整辞典释义</summary><p>${escape(w.meaning)}</p></details>`:''}
       ${mode==='spell'?`<p id="vSpellResult" class="${spellCorrect?'v-correct':'v-wrong'}" role="status">${spellCorrect?'拼写正确':'正确拼写是 '+escape(w.word)+'；这次记为“忘记”，稍后再练。'}</p><div class="v-audio">${btn('us','美音 ▷')}${btn('uk','英音 ▷')}</div>`:''}
-      <div class="v-example"><span>IN CONTEXT / 放进语境</span><p>${escape(w.example)}</p><small>${escape(w.translation)}</small>${btn('example','听例句 ▷')}</div><p class="v-collocation"><span>常用搭配</span> ${escape(w.phrase)}</p></div>
+      <div class="v-example"><span>IN CONTEXT / 放进语境</span><p>${escape(w.example)}</p><small>${escape(w.translation)}</small>${btn('example','听例句 ▷')}</div><p class="v-collocation"><span>${escape(w.phraseKind||'常用搭配')}</span> ${escape(w.phrase)}</p>${credit(w)}</div>
       <div class="v-reveal" ${revealed?'hidden':''}>${mode==='recall'?btn('reveal','想好了吗？查看释义 ↵','v-primary'):btn('reveal','暂时想不起，查看答案')}<p>先主动回忆，再揭晓；不急着翻页。</p></div>
       <div id="vRating" class="v-rating" ${revealed&&!rated?'':'hidden'}><p>这一次，你记得多清楚？</p><div>${btn('again','<b>忘记了</b><small>约 10 分钟后</small>','v-again')}${btn('hard','<b>有点模糊</b><small>明天再见</small>')}${btn('good','<b>记住了</b><small>延长复习间隔</small>','v-primary')}</div></div>
       <div id="vSaved" class="v-saved" ${rated?'':'hidden'} role="status"><p id="vSavedText"></p>${btn('next','下一词 ↵','v-primary')}</div>
@@ -138,8 +140,8 @@
   }
   function renderLibrary() {
     screen='library';current=null;const s=stats(),term=search.trim().toLowerCase();
-    const list=words().filter(w=>(!term||`${w.word} ${w.meaning}`.toLowerCase().includes(term))&&(filter==='stars'?s.d.stars[w.id]?.value:filter==='new'?!s.d.cards[w.id]:filter==='due'?s.d.cards[w.id]?.due<=Date.now():true));
-    root.innerHTML=`<div class="v-study-top">${btn('home','← 词汇书')}<h2>${filter==='stars'?'我的生词本':'词汇目录'}</h2>${btn('starstudy','练习生词本','v-primary')}</div><div class="v-controls"><label class="v-search">搜索英文 / 中文<input id="vSearch" value="${escape(search)}" placeholder="例如：sustainable / 可持续"></label><label>范围<select id="vFilter"><option value="all" ${filter==='all'?'selected':''}>全部词汇</option><option value="new" ${filter==='new'?'selected':''}>未学词</option><option value="due" ${filter==='due'?'selected':''}>到期词</option><option value="stars" ${filter==='stars'?'selected':''}>生词本</option></select></label>${selectors()}</div><p class="v-list-count">${list.length} 个词 · 点击词条开始练习</p><div class="v-word-list">${list.slice(0,libraryLimit).map(w=>`<button class="v-word-row" data-word="${escape(w.id)}"><span><b>${escape(w.word)}</b><small>${escape(w.topic)} · ${escape(w.pos)}</small></span><span>${escape(w.meaning)}</span><em>${s.d.stars[w.id]?.value?'★ ':''}${s.d.cards[w.id]?'已学':'新词'} ↗</em></button>`).join('')||'<div class="v-empty">没有符合条件的单词。试试更换主题或搜索词。</div>'}</div>${list.length>libraryLimit?btn('loadmore','显示更多'):''}`;
+    const list=words().filter(w=>(!term||`${w.word} ${w.aliases.join(' ')} ${w.meaning}`.toLowerCase().includes(term))&&(filter==='stars'?s.d.stars[w.id]?.value:filter==='new'?!s.d.cards[w.id]:filter==='due'?s.d.cards[w.id]?.due<=Date.now():true));
+    root.innerHTML=`<div class="v-study-top">${btn('home','← 词汇书')}<h2>${filter==='stars'?'我的生词本':'词汇目录'}</h2>${btn('starstudy','练习生词本','v-primary')}</div><div class="v-controls"><label class="v-search">搜索英文 / 中文<input id="vSearch" value="${escape(search)}" placeholder="例如：sustainable / 可持续"></label><label>范围<select id="vFilter"><option value="all" ${filter==='all'?'selected':''}>全部词汇</option><option value="new" ${filter==='new'?'selected':''}>未学词</option><option value="due" ${filter==='due'?'selected':''}>到期词</option><option value="stars" ${filter==='stars'?'selected':''}>生词本</option></select></label>${selectors()}</div><p class="v-list-count">${list.length} 个词 · 点击词条开始练习</p><div class="v-word-list">${list.slice(0,libraryLimit).map(w=>`<button class="v-word-row" data-word="${escape(w.id)}"><span><b>${escape(w.word)}</b><small>${escape(w.level||'核心')} · ${escape(w.topic)} · ${escape(w.pos)}</small></span><span>${escape(shortMeaning(w))}</span><em>${s.d.stars[w.id]?.value?'★ ':''}${s.d.cards[w.id]?'已学':'新词'} ↗</em></button>`).join('')||'<div class="v-empty">没有符合条件的单词。试试更换主题或搜索词。</div>'}</div>${list.length>libraryLimit?btn('loadmore','显示更多'):''}`;
   }
   function audio(accent,text) {
     if(!('speechSynthesis' in window)) return app.toast('这个浏览器不支持系统朗读');
@@ -173,6 +175,7 @@
     root.addEventListener('change',e=>{
       if(e.target.id==='vGoal') {const d=data();d.preferences={goal:Number(e.target.value),updatedAt:Date.now(),changeId:changeId()};save(d);}
       if(e.target.id==='vTopic')topic=e.target.value;
+      if(e.target.id==='vLevel')level=e.target.value;
       if(e.target.id==='vMode')mode=e.target.value;
       if(e.target.id==='vFilter')filter=e.target.value;
       if(screen==='library')renderLibrary();else if(screen==='home')renderHome();
