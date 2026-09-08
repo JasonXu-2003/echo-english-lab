@@ -52,7 +52,8 @@
       mastered:book.words.filter(w=>(d.cards[w.id]?.repetitions||0)>=4).length,
       stars:book.words.filter(w=>d.stars[w.id]?.value).length,goal:[10,20,30,50].includes(d.preferences.goal)?d.preferences.goal:20};
   };
-  const btn=(action,text,cls='')=>`<button type="button" class="v-btn ${cls}" data-v-action="${action}">${text}</button>`;
+  const ratingKeys={again:'1',hard:'2',good:'3'};
+  const btn=(action,text,cls='')=>`<button type="button" class="v-btn ${cls}" data-v-action="${action}"${ratingKeys[action]?` aria-keyshortcuts="${ratingKeys[action]}" title="快捷键 ${ratingKeys[action]}"`:''}>${text}</button>`;
   const selectors=()=>`<label>层级<select id="vLevel">${['全部层级',...(book.levels||[])].map(t=>`<option ${t===level?'selected':''}>${escape(t)}</option>`).join('')}</select></label><label>主题<select id="vTopic">${['全部主题',...book.topics].map(t=>`<option ${t===topic?'selected':''}>${escape(t)}</option>`).join('')}</select></label><label>学习方式<select id="vMode"><option value="recall" ${mode==='recall'?'selected':''}>看词回忆</option><option value="spell" ${mode==='spell'?'selected':''}>中译英拼写</option></select></label>`;
   function save(d) {app.set(d);}
   function show() {
@@ -102,7 +103,7 @@
       ${mode==='spell'?`<p id="vSpellResult" class="${spellCorrect?'v-correct':'v-wrong'}" role="status">${spellCorrect?'拼写正确':'正确拼写是 '+escape(w.word)+'；这次记为“忘记”，稍后再练。'}</p><div class="v-audio">${btn('us','美音 ▷')}${btn('uk','英音 ▷')}</div>`:''}
       <div class="v-example"><span>IN CONTEXT / 放进语境</span><p>${escape(w.example)}</p><small>${escape(w.translation)}</small>${btn('example','听例句 ▷')}</div><p class="v-collocation"><span>${escape(w.phraseKind||'常用搭配')}</span> ${escape(w.phrase)}</p>${credit(w)}</div>
       <div class="v-reveal" ${revealed?'hidden':''}>${mode==='recall'?btn('reveal','想好了吗？查看释义 ↵','v-primary'):btn('reveal','暂时想不起，查看答案')}<p>先主动回忆，再揭晓；不急着翻页。</p></div>
-      <div id="vRating" class="v-rating" ${revealed&&!rated?'':'hidden'}><p>这一次，你记得多清楚？</p><div>${btn('again','<b>忘记了</b><small>约 10 分钟后</small>','v-again')}${btn('hard','<b>有点模糊</b><small>明天再见</small>')}${btn('good','<b>记住了</b><small>延长复习间隔</small>','v-primary')}</div></div>
+      <div id="vRating" class="v-rating" ${revealed&&!rated?'':'hidden'}><p>这一次，你记得多清楚？按数字键 1 / 2 / 3 评价</p><div>${btn('again','<b><kbd>1</kbd> 忘记了</b><small>约 10 分钟后</small>','v-again')}${btn('hard','<b><kbd>2</kbd> 有点模糊</b><small>明天再见</small>')}${btn('good','<b><kbd>3</kbd> 记住了</b><small>延长复习间隔</small>','v-primary')}</div></div>
       <div id="vSaved" class="v-saved" ${rated?'':'hidden'} role="status"><p id="vSavedText"></p>${btn('next','下一词 ↵','v-primary')}</div>
       <footer class="v-card-foot">${btn('previous','← 上一个')}<span>释义会保留，下一词由你决定。</span></footer></article>`;
     if(mode==='spell'&&!spellChecked) requestAnimationFrame(()=>$('vSpell')?.focus());
@@ -182,9 +183,15 @@
     });
     document.addEventListener('keydown',e=>{
       if(!shown||document.querySelector('dialog[open]')||e.isComposing||e.keyCode===229||e.repeat||e.ctrlKey||e.metaKey||e.altKey||e.shiftKey) return;
+      const target=e.target;
+      const typing=target.isContentEditable||Boolean(target.closest('input,textarea,[contenteditable="true"]'));
+      const checkedSpelling=target.id==='vSpell'&&target.readOnly&&spellChecked;
+      if(target.closest('select')||(typing&&!checkedSpelling)) return;
+      if(current&&revealed&&!rated&&['1','2','3'].includes(e.key)) {
+        e.preventDefault();rate(['again','hard','good'][Number(e.key)-1]);return;
+      }
       if(e.target.matches('select,button')||e.target.id==='vSearch')return;
       if(e.key==='Enter'&&current){e.preventDefault();if(rated)act('next');else if(mode==='spell'&&!spellChecked)checkSpelling();else if(!revealed)reveal();}
-      if(e.target.tagName!=='INPUT'&&revealed&&!rated&&['1','2','3'].includes(e.key)) {e.preventDefault();rate(['again','hard','good'][Number(e.key)-1]);}
     });
     if(new URLSearchParams(location.search).get('view')==='vocabulary')show();
   }

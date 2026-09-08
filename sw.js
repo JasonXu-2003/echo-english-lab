@@ -1,4 +1,4 @@
-const CACHE = "echo-english-lab-v14";
+const CACHE = "echo-english-lab-v15";
 const ASSETS = ["./", "./index.html", "./questions.js", "./question-factory.js", "./supabase-config.js", "./cloud-sync.js", "./review.js", "./vocabulary.js", "./vocabulary-data.js", "./vocabulary.css", "./vendor/supabase.min.js", "./manifest.webmanifest"];
 ASSETS.push('./vocabulary-expanded.js','./vocabulary-sources.html','./vocabulary-audit.json');
 const assetURLs = new Set(ASSETS.map(path => new URL(path, self.registration.scope).href));
