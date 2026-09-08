@@ -1,5 +1,5 @@
-const CACHE = "echo-english-lab-v12";
-const ASSETS = ["./", "./index.html", "./questions.js", "./question-factory.js", "./supabase-config.js", "./cloud-sync.js", "./review.js", "./vendor/supabase.min.js", "./manifest.webmanifest"];
+const CACHE = "echo-english-lab-v13";
+const ASSETS = ["./", "./index.html", "./questions.js", "./question-factory.js", "./supabase-config.js", "./cloud-sync.js", "./review.js", "./vocabulary.js", "./vocabulary-data.js", "./vocabulary.css", "./vendor/supabase.min.js", "./manifest.webmanifest"];
 const assetURLs = new Set(ASSETS.map(path => new URL(path, self.registration.scope).href));
 
 self.addEventListener("install", event => {

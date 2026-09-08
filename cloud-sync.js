@@ -100,6 +100,7 @@
       custom: mergeCustom(remote.custom, local.custom),
       mistakes: mergeMistakes(remote.mistakes, local.mistakes),
       mastered: mergeCountMap(remote.mastered, local.mastered),
+      vocabulary: window.EchoVocab ? window.EchoVocab.merge(local.vocabulary,remote.vocabulary) : (latest.vocabulary||{}),
       activity: { ...(remote.activity || {}), ...(local.activity || {}) },
       dailyAnswers: mergeCountMap(remote.dailyAnswers, local.dailyAnswers),
       attempts: Math.max(Number(remote.attempts) || 0, Number(local.attempts) || 0),

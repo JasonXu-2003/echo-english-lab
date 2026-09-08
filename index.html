@@ -6,7 +6,8 @@
   <meta name="theme-color" content="#171814" />
   <meta name="description" content="Echo 英语句子主动回忆训练：中译英、跟读、错题复习和自定义题库。" />
   <title>Echo · 英语回声训练室</title>
-  <meta name="echo-release" content="2026-09-07.3" />
+  <meta name="echo-release" content="2026-09-08.1" />
+  <link rel="stylesheet" href="vocabulary.css" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23171814'/%3E%3Ccircle cx='32' cy='32' r='21' fill='%23c9f73c'/%3E%3Cpath d='M39 20H25v24h15v-5H31v-5h8v-5h-8v-4h8z' fill='%23171814'/%3E%3C/svg%3E" />
   <link rel="manifest" href="manifest.webmanifest" />
   <style>
@@ -447,6 +448,10 @@
           <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 2v4m8-4v4M8 10h8m-8 4h5"/></svg>
           <span>今日训练</span><em id="dailyCount">50/日</em>
         </button>
+        <button class="nav-button" id="vocabNav" title="背单词 · 雅思核心词汇" aria-label="背单词 · 雅思核心词汇">
+          <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 4h7l2 2 2-2h7v16h-7l-2 2-2-2H3zM12 6v16M6 9h3m-3 4h3m6-4h3m-3 4h3"/></svg>
+          <span>背单词</span><em>IELTS</em>
+        </button>
         <button class="nav-button" data-view="review" title="错题回声">
           <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 3-6.25L4 8m0-5v5h5"/><path d="M12 8v5l3 2"/></svg>
           <span>错题回声</span><em id="mistakeCount">0</em>
@@ -600,6 +605,7 @@
           </button>
         </footer>
       </section>
+      <section id="vocabView" aria-label="雅思词汇学习" hidden></section>
     </main>
   </div>
 
@@ -670,6 +676,8 @@
   <script src="supabase-config.js"></script>
   <script src="cloud-sync.js"></script>
   <script src="review.js"></script>
+  <script src="vocabulary-data.js"></script>
+  <script src="vocabulary.js"></script>
   <script>
     const allQuestionSources = [...(window.ECHO_QUESTIONS || []), ...(window.ECHO_GENERATED_QUESTIONS || [])];
     const questionKeys = new Set();
@@ -728,7 +736,7 @@
     ];
 
     function emptyState() {
-      return { custom: [], mistakes: {}, mastered: {}, attempts: 0, correct: 0, activity: {}, dailyAnswers: {}, lastIndex: 0, updatedAt: null, resetAt: null };
+      return { custom: [], mistakes: {}, mastered: {}, vocabulary: {}, attempts: 0, correct: 0, activity: {}, dailyAnswers: {}, lastIndex: 0, updatedAt: null, resetAt: null };
     }
     function normalizeState(value) {
       return { ...emptyState(), ...(value || {}) };
@@ -756,6 +764,7 @@
       index = Math.max(0, activePool.indexOf(remembered));
       updateCounts();
       renderQuestion();
+      window.EchoVocab?.refresh(true);
     }
     function activateAccount(userId) {
       const accountKey = `${anonymousStorageKey}:account:${userId}`;
@@ -784,6 +793,7 @@
       localStorage.setItem(storageKey, JSON.stringify(state));
       updateCounts();
       updateProgress();
+      window.EchoVocab?.refresh();
     }
     function normalize(text) {
       return text.toLowerCase().replace(/[’‘]/g, "'").replace(/[^a-z0-9' ]/g, "").replace(/\s+/g, " ").trim();
@@ -1133,6 +1143,7 @@
 
     function switchPool(newPool, title, eyebrow) {
       if (!newPool.length) { toast("这里还没有题目，先完成几道练习吧"); return; }
+      window.EchoVocab?.close();
       activePool = newPool;
       index = 0;
       $("#courseTitle").textContent = title;
@@ -1209,6 +1220,7 @@
     $("#compactBtn").addEventListener("click", () => {
       const url = new URL(location.href);
       url.searchParams.set("compact", "1");
+      if (document.body.classList.contains("vocabulary-open")) url.searchParams.set("view", "vocabulary");
       const popup = window.open(url, "echoStudyWindow", "popup=yes,width=430,height=720,resizable=yes,scrollbars=yes");
       if (!popup) toast("浏览器拦截了小窗，请允许此网站打开弹出式窗口。", 3000);
       else popup.focus();
@@ -1238,13 +1250,14 @@
     });
 
     $("#resetBtn").addEventListener("click", () => {
-      if (!confirm("要清除学习统计、错题和自定义题目吗？此操作无法撤销。")) return;
+      if (!confirm("要清除学习统计、错题、自定义题目，以及背词进度和生词本吗？此操作无法撤销。")) return;
       state = emptyState();
       state.resetAt = new Date().toISOString();
       state.updatedAt = state.resetAt;
       localStorage.setItem(storageKey, JSON.stringify(state));
       pool = [...seedQuestions]; activePool = buildDailyPool(pool); index = 0;
       updateCounts(); renderQuestion(); window.EchoCloud?.scheduleSync(); toast("学习记录已重置");
+      window.EchoVocab?.refresh(true);
     });
 
     $$(".lesson-button").forEach(btn => btn.addEventListener("click", () => {
@@ -1263,12 +1276,14 @@
       switchPool(review, "把卡住的句子说顺", "Review · Memory echo");
     }));
     $$('[data-view="speak"]').forEach(btn => btn.addEventListener("click", () => {
+      window.EchoVocab?.close();
       speak(currentQuestion().en, .72); startRecognition();
     }));
 
     document.addEventListener("keydown", (event) => {
-      if (event.isComposing || event.keyCode === 229) return;
       if (event.key === "Escape" && document.body.classList.contains("focus-mode")) document.body.classList.remove("focus-mode");
+      if (document.body.classList.contains("vocabulary-open")) return;
+      if (event.isComposing || event.keyCode === 229) return;
       if (event.key === "Enter" && !event.shiftKey && !document.querySelector("dialog[open]")) {
         event.preventDefault();
         if (event.repeat) return;
@@ -1291,6 +1306,7 @@
     timerTick = setInterval(updateTimer, 1000);
     if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("./sw.js").catch(() => {});
     updateCounts(); renderQuestion(); updateTimer();
+    window.EchoVocab?.init({get:()=>state.vocabulary||{},set:value=>{state.vocabulary=value;saveState();},toast});
     window.EchoCloud?.init({
       getState: () => JSON.parse(JSON.stringify(state)),
       replaceState,
