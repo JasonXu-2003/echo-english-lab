@@ -57,6 +57,7 @@
     if (setup) setup.hidden = ready;
     const form = document.querySelector("#authForm");
     if (form) form.hidden = !ready;
+    window.dispatchEvent(new Event('echo-account-change'));
   }
 
   function mergeCountMap(remote = {}, local = {}) {
@@ -101,6 +102,7 @@
       mistakes: mergeMistakes(remote.mistakes, local.mistakes),
       mastered: mergeCountMap(remote.mastered, local.mastered),
       vocabulary: window.EchoVocab ? window.EchoVocab.merge(local.vocabulary,remote.vocabulary) : (latest.vocabulary||{}),
+      profile: window.EchoHome ? window.EchoHome.mergeProfile(local.profile,remote.profile) : (latest.profile||{}),
       activity: { ...(remote.activity || {}), ...(local.activity || {}) },
       dailyAnswers: mergeCountMap(remote.dailyAnswers, local.dailyAnswers),
       attempts: Math.max(Number(remote.attempts) || 0, Number(local.attempts) || 0),
@@ -315,5 +317,6 @@
       return window.EchoReview.validate(result);
     } finally { clearTimeout(timer); }
   }
-  window.EchoCloud = { init, scheduleSync, syncNow, mergeStates, reviewAnswer };
+  const getIdentity=()=>currentUser?{name:currentUser.user_metadata?.display_name||currentUser.user_metadata?.full_name||currentUser.user_metadata?.name||'',email:currentUser.email||''}:{};
+  window.EchoCloud = { init, scheduleSync, syncNow, mergeStates, reviewAnswer, getIdentity };
 })();

@@ -6,8 +6,9 @@
   <meta name="theme-color" content="#171814" />
   <meta name="description" content="Echo 英语句子主动回忆训练：中译英、跟读、错题复习和自定义题库。" />
   <title>Echo · 英语回声训练室</title>
-  <meta name="echo-release" content="2026-09-08.3" />
+  <meta name="echo-release" content="2026-09-08.4" />
   <link rel="stylesheet" href="vocabulary.css?release=2026-09-08.3" />
+  <link rel="stylesheet" href="home.css?release=2026-09-08.4" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23171814'/%3E%3Ccircle cx='32' cy='32' r='21' fill='%23c9f73c'/%3E%3Cpath d='M39 20H25v24h15v-5H31v-5h8v-5h-8v-4h8z' fill='%23171814'/%3E%3C/svg%3E" />
   <link rel="manifest" href="manifest.webmanifest" />
   <style>
@@ -444,6 +445,7 @@
       </div>
       <nav aria-label="主导航">
         <div class="side-label">Practice</div>
+        <button class="nav-button" id="homeNav" title="学习主页" aria-label="学习主页"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3Z"/><path d="M9 20v-7h6v7"/></svg><span>学习主页</span></button>
         <button class="nav-button active" data-view="daily" title="今日训练">
           <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 2v4m8-4v4M8 10h8m-8 4h5"/></svg>
           <span>今日训练</span><em id="dailyCount">50/日</em>
@@ -605,6 +607,7 @@
           </button>
         </footer>
       </section>
+      <section id="homeView" aria-label="学习主页" hidden></section>
       <section id="vocabView" aria-label="雅思词汇学习" hidden></section>
     </main>
   </div>
@@ -674,11 +677,12 @@
   <script src="question-factory.js"></script>
   <script src="vendor/supabase.min.js"></script>
   <script src="supabase-config.js"></script>
-  <script src="cloud-sync.js"></script>
+  <script src="cloud-sync.js?release=2026-09-08.4"></script>
   <script src="review.js"></script>
   <script src="vocabulary-data.js"></script>
   <script src="vocabulary-expanded.js?release=2026-09-08.2"></script>
-  <script src="vocabulary.js?release=2026-09-08.3"></script>
+  <script src="vocabulary.js?release=2026-09-08.4"></script>
+  <script src="home.js?release=2026-09-08.4"></script>
   <script>
     const allQuestionSources = [...(window.ECHO_QUESTIONS || []), ...(window.ECHO_GENERATED_QUESTIONS || [])];
     const questionKeys = new Set();
@@ -693,7 +697,7 @@
     const anonymousStorageKey = "echo-english-lab-v1";
     const anonymousOwnerKey = "echo-english-lab-v1-anonymous-owner";
     let storageKey = anonymousStorageKey;
-    const todayKey = new Date().toISOString().slice(0, 10);
+    const todayKey = () => window.EchoHome.dayKey();
     let state = loadState();
     let pool = [...seedQuestions, ...state.custom];
     let activePool = buildDailyPool(pool);
@@ -737,7 +741,7 @@
     ];
 
     function emptyState() {
-      return { custom: [], mistakes: {}, mastered: {}, vocabulary: {}, attempts: 0, correct: 0, activity: {}, dailyAnswers: {}, lastIndex: 0, updatedAt: null, resetAt: null };
+      return { custom: [], mistakes: {}, mastered: {}, vocabulary: {}, profile: {}, attempts: 0, correct: 0, activity: {}, dailyAnswers: {}, lastIndex: 0, updatedAt: null, resetAt: null };
     }
     function normalizeState(value) {
       return { ...emptyState(), ...(value || {}) };
@@ -752,11 +756,12 @@
     }
     function saveState({ skipCloud = false } = {}) {
       state.lastIndex = Math.max(0, pool.indexOf(activePool[index]));
-      state.activity[todayKey] = true;
+      state.activity[todayKey()] = true;
       state.updatedAt = new Date().toISOString();
       localStorage.setItem(storageKey, JSON.stringify(state));
       updateCounts();
       if (!skipCloud) window.EchoCloud?.scheduleSync();
+      window.EchoHome?.refresh();
     }
     function rebuildFromState() {
       pool = [...seedQuestions, ...state.custom];
@@ -766,6 +771,7 @@
       updateCounts();
       renderQuestion();
       window.EchoVocab?.refresh(true);
+      window.EchoHome?.refresh(true);
     }
     function activateAccount(userId) {
       const accountKey = `${anonymousStorageKey}:account:${userId}`;
@@ -795,6 +801,7 @@
       updateCounts();
       updateProgress();
       window.EchoVocab?.refresh();
+      window.EchoHome?.refresh();
     }
     function normalize(text) {
       return text.toLowerCase().replace(/[’‘]/g, "'").replace(/[^a-z0-9' ]/g, "").replace(/\s+/g, " ").trim();
@@ -827,7 +834,7 @@
     }
     function seededShuffle(items, salt = "") {
       const result = [...items];
-      let seed = hashString(`${todayKey}-${salt}`) || 1;
+      let seed = hashString(`${todayKey()}-${salt}`) || 1;
       const random = () => {
         seed += 0x6D2B79F5;
         let t = seed;
@@ -868,7 +875,7 @@
         if (!blocksByCategory.has(block.category)) blocksByCategory.set(block.category, []);
         blocksByCategory.get(block.category).push(block);
       });
-      const rotation = hashString(todayKey) % categoryOrder.length;
+      const rotation = hashString(todayKey()) % categoryOrder.length;
       const rotatedCategories = [...categoryOrder.slice(rotation), ...categoryOrder.slice(0, rotation)];
       const orderedBlocks = [];
       let blocksRemain = true;
@@ -961,7 +968,7 @@
     function currentQuestion() { return activePool[index] || pool[0]; }
 
     function updateProgress() {
-      const done = state.dailyAnswers[todayKey] || 0;
+      const done = state.dailyAnswers[todayKey()] || 0;
       const reached = done >= DAILY_GOAL;
       $("#currentCount").textContent = done;
       $("#totalCount").textContent = reached ? "∞" : DAILY_GOAL;
@@ -1005,7 +1012,7 @@
       $("#nextBtn").classList.remove("ready");
       $("#nextBtn").title = "下一题";
       $("#nextBtn").setAttribute("aria-label", "下一题");
-      requestAnimationFrame(() => $("#answerInput").focus());
+      requestAnimationFrame(() => { if(!document.body.classList.contains('home-open')&&!document.body.classList.contains('vocabulary-open')) $("#answerInput").focus(); });
     }
 
     async function checkAnswer() {
@@ -1034,8 +1041,9 @@
       }
       const isAccepted = assessment.grade === "exact" || assessment.grade === "equivalent";
       const unverified = !isAccepted && (!review || review.verdict==='uncertain');
-      const previousDaily = state.dailyAnswers[todayKey] || 0;
-      state.dailyAnswers[todayKey] = previousDaily + 1;
+      const answerDay = todayKey();
+      const previousDaily = state.dailyAnswers[answerDay] || 0;
+      state.dailyAnswers[answerDay] = previousDaily + 1;
       state.attempts++;
       if (isAccepted) {
         state.correct++;
@@ -1145,6 +1153,8 @@
     function switchPool(newPool, title, eyebrow) {
       if (!newPool.length) { toast("这里还没有题目，先完成几道练习吧"); return; }
       window.EchoVocab?.close();
+      window.EchoHome?.close();
+      const routeURL=new URL(location.href);routeURL.searchParams.set('view','practice');history.replaceState(null,'',routeURL);
       activePool = newPool;
       index = 0;
       $("#courseTitle").textContent = title;
@@ -1167,23 +1177,15 @@
       renderWeek();
     }
     function calculateStreak() {
-      let streak = 0;
-      const d = new Date();
-      for (let i = 0; i < 365; i++) {
-        const key = d.toISOString().slice(0, 10);
-        if (state.activity[key] || (i === 0 && state.attempts === 0)) streak++;
-        else break;
-        d.setDate(d.getDate() - 1);
-      }
-      return Math.max(1, streak);
+      return window.EchoHome.streak(state);
     }
     function renderWeek() {
       const names = ["日", "一", "二", "三", "四", "五", "六"];
       const days = [];
       for (let i = 6; i >= 0; i--) {
         const d = new Date(); d.setDate(d.getDate() - i);
-        const key = d.toISOString().slice(0, 10);
-        days.push(`<div class="day ${state.activity[key] ? "done" : ""}">${names[d.getDay()]}<i></i></div>`);
+        const key = window.EchoHome.dayKey(d);
+        days.push(`<div class="day ${window.EchoHome.dayStats(state,key).active ? "done" : ""}">${names[d.getDay()]}<i></i></div>`);
       }
       $("#weekStrip").innerHTML = days.join("");
     }
@@ -1247,18 +1249,21 @@
       event.preventDefault();
       const item = { cn: $("#customCn").value.trim(), en: $("#customEn").value.trim(), alts: [], category: "自定义题库", scene: "我的旅行场景", speaker: "Context", context: "Respond naturally in this situation.", tag: $("#customTag").value.trim() || "自定义 · 主动回忆" };
       state.custom.push(item); pool = [...seedQuestions, ...state.custom]; activePool = buildDailyPool(pool); index = activePool.indexOf(item);
-      saveState(); event.target.reset(); $("#customDialog").close(); renderQuestion(); toast("已加入题库");
+      window.EchoVocab?.close();window.EchoHome?.close();saveState(); event.target.reset(); $("#customDialog").close(); renderQuestion(); toast("已加入题库");
     });
 
     $("#resetBtn").addEventListener("click", () => {
       if (!confirm("要清除学习统计、错题、自定义题目，以及背词进度和生词本吗？此操作无法撤销。")) return;
+      const savedProfile = state.profile;
       state = emptyState();
+      state.profile = savedProfile;
       state.resetAt = new Date().toISOString();
       state.updatedAt = state.resetAt;
       localStorage.setItem(storageKey, JSON.stringify(state));
       pool = [...seedQuestions]; activePool = buildDailyPool(pool); index = 0;
       updateCounts(); renderQuestion(); window.EchoCloud?.scheduleSync(); toast("学习记录已重置");
       window.EchoVocab?.refresh(true);
+      window.EchoHome?.refresh(true);
     });
 
     $$(".lesson-button").forEach(btn => btn.addEventListener("click", () => {
@@ -1278,11 +1283,13 @@
     }));
     $$('[data-view="speak"]').forEach(btn => btn.addEventListener("click", () => {
       window.EchoVocab?.close();
+      window.EchoHome?.close();
       speak(currentQuestion().en, .72); startRecognition();
     }));
 
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && document.body.classList.contains("focus-mode")) document.body.classList.remove("focus-mode");
+      if (document.body.classList.contains("home-open")) return;
       if (document.body.classList.contains("vocabulary-open")) return;
       if (event.isComposing || event.keyCode === 229) return;
       if (event.key === "Enter" && !event.shiftKey && !document.querySelector("dialog[open]")) {
@@ -1308,6 +1315,7 @@
     if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("./sw.js").catch(() => {});
     updateCounts(); renderQuestion(); updateTimer();
     window.EchoVocab?.init({get:()=>state.vocabulary||{},set:value=>{state.vocabulary=value;saveState();},toast});
+    window.EchoHome.init({get:()=>state,setProfile:profile=>{state.profile=profile;saveState();}});
     window.EchoCloud?.init({
       getState: () => JSON.parse(JSON.stringify(state)),
       replaceState,
