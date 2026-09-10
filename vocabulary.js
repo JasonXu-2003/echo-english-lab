@@ -44,6 +44,12 @@
   const changeId=()=>crypto.randomUUID();
   const words=()=>book.words.filter(w=>(topic==='全部主题'||w.topic===topic)&&(level==='全部层级'||w.level===level));
   const shortMeaning=w=>w.meaning.length>100?w.meaning.split(/[；，]/).slice(0,5).join('；'):w.meaning;
+  const phonetics=w=>{
+    const text=window.EchoPhonetics?.format(w)||w.phonetic;
+    if(!text)return '<p class="v-phonetic"><small>音标待补充</small></p>';
+    const url=w.phoneticURL||'https://github.com/skywind3000/ECDICT';
+    return `<div class="v-phonetic"><span class="v-ipa" aria-label="参考音标">/${escape(text)}/</span><a href="${escape(url)}" target="_blank" rel="noopener" title="${escape(w.phoneticSource||'ECDICT')} · 词典参考读音；系统英美朗读可能与之不同">参考音标 ↗</a>${w.phoneticNote?`<small class="v-phonetic-note">${escape(w.phoneticNote)}</small>`:''}</div>`;
+  };
   const credit=w=>w.attribution?`<details class="v-source"><summary>例句来源与署名</summary><p>${escape(w.attribution)}</p><a href="https://tatoeba.org/en/sentences/show/${escape(w.exampleId)}" target="_blank" rel="noopener">英文原句</a> · <a href="https://tatoeba.org/en/sentences/show/${escape(w.translationId)}" target="_blank" rel="noopener">中文原句</a> · <a href="https://creativecommons.org/licenses/by/2.0/fr/" target="_blank" rel="noopener">CC BY 2.0 FR</a><p>释义：ECDICT（MIT）。例句片段从原句截取，不代表固定搭配。社区例句可能存在不自然表达或译义偏差。</p></details>`:'';
   const stats=()=>{
     const d=data(),today=Object.values(d.days[dayKey()]||{}),now=Date.now();
@@ -100,9 +106,9 @@
     const w=current,s=stats(),star=Boolean(s.d.stars[w.id]?.value);
     root.innerHTML=`<div class="v-study-top">${btn('home','← 词汇书')}<span>${mode==='spell'?'中译英拼写':'看词回忆'} · ${cursor+1} / ${queue.length}</span>${btn('star',star?'★ 已加入生词本':'☆ 加入生词本')}</div>
       <article class="v-card"><div class="v-kicker">${escape(w.topic)} · ${escape(w.level||'核心')} · ${s.d.cards[w.id]?'复习词':'新词'}</div>
-      ${mode==='recall'?`<h2 class="v-word">${escape(w.word)}</h2>${w.phonetic?`<p class="v-phonetic">/${escape(w.phonetic)}/ <small>词典音标</small></p>`:''}<div class="v-audio">${btn('us','美音 ▷')}${btn('uk','英音 ▷')}<span>设备系统朗读</span></div>`:`<h2 class="v-meaning-prompt">${escape(shortMeaning(w))}</h2><p class="v-pos">${escape(w.pos)} · ${w.word.length} 个字母</p><form id="vSpellForm"><label class="v-sr" for="vSpell">拼写英文单词</label><input id="vSpell" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="80" placeholder="在这里拼出英文单词…" ${spellChecked?'readonly':''}><button type="submit" class="v-btn v-primary" ${spellChecked?'disabled':''}>检查拼写 ↵</button></form>`}
+      ${mode==='recall'?`<h2 class="v-word">${escape(w.word)}</h2>${phonetics(w)}<div class="v-audio">${btn('us','美音 ▷')}${btn('uk','英音 ▷')}<span>设备系统朗读</span></div>`:`<h2 class="v-meaning-prompt">${escape(shortMeaning(w))}</h2><p class="v-pos">${escape(w.pos)} · ${w.word.length} 个字母</p><form id="vSpellForm"><label class="v-sr" for="vSpell">拼写英文单词</label><input id="vSpell" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="80" placeholder="在这里拼出英文单词…" ${spellChecked?'readonly':''}><button type="submit" class="v-btn v-primary" ${spellChecked?'disabled':''}>检查拼写 ↵</button></form>`}
       <div id="vAnswer" ${revealed?'':'hidden'}><p class="v-definition">${mode==='spell'?`<strong>${escape(w.word)}</strong> · `:''}<span>${escape(w.pos)}</span> ${escape(shortMeaning(w))}</p>${w.meaning.length>100?`<details class="v-source"><summary>查看完整辞典释义</summary><p>${escape(w.meaning)}</p></details>`:''}
-      ${mode==='spell'?`<p id="vSpellResult" class="${spellCorrect?'v-correct':'v-wrong'}" role="status">${spellCorrect?'拼写正确':'正确拼写是 '+escape(w.word)+'；这次记为“忘记”，稍后再练。'}</p><div class="v-audio">${btn('us','美音 ▷')}${btn('uk','英音 ▷')}</div>`:''}
+      ${mode==='spell'?`${spellChecked?phonetics(w):''}<p id="vSpellResult" class="${spellCorrect?'v-correct':'v-wrong'}" role="status">${spellCorrect?'拼写正确':'正确拼写是 '+escape(w.word)+'；这次记为“忘记”，稍后再练。'}</p><div class="v-audio">${btn('us','美音 ▷')}${btn('uk','英音 ▷')}</div>`:''}
       <div class="v-example"><span>IN CONTEXT / 放进语境</span><p>${escape(w.example)}</p><small>${escape(w.translation)}</small>${btn('example','听例句 ▷')}</div><p class="v-collocation"><span>${escape(w.phraseKind||'常用搭配')}</span> ${escape(w.phrase)}</p>${credit(w)}</div>
       <div class="v-reveal" ${revealed?'hidden':''}>${mode==='recall'?btn('reveal','想好了吗？查看释义 ↵','v-primary'):btn('reveal','暂时想不起，查看答案')}<p>先主动回忆，再揭晓；不急着翻页。</p></div>
       <div id="vRating" class="v-rating" ${revealed&&!rated?'':'hidden'}><p>这一次，你记得多清楚？按 1 / 2 / 空格键评价</p><div>${btn('again','<b><kbd>1</kbd> 忘记了</b><small>约 10 分钟后</small>','v-again')}${btn('hard','<b><kbd>2</kbd> 有点模糊</b><small>明天再见</small>')}${btn('good','<b><kbd>空格</kbd> 记住了</b><small>延长复习间隔</small>','v-primary')}</div></div>
