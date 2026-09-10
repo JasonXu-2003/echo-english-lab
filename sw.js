@@ -1,7 +1,8 @@
-const CACHE = "echo-english-lab-v19";
+const CACHE = "echo-english-lab-v20";
 const ASSETS = ["./", "./index.html", "./questions.js", "./question-factory.js", "./supabase-config.js", "./cloud-sync.js", "./review.js", "./vocabulary.js", "./vocabulary-data.js", "./vocabulary.css", "./vendor/supabase.min.js", "./manifest.webmanifest"];
 ASSETS.push('./vocabulary-expanded.js','./vocabulary-sources.html','./vocabulary-audit.json');
 ASSETS.push('./home.js','./home.css');
+ASSETS.push('./shortcuts.js','./shortcuts.css');
 ASSETS.push('./daily-life-data.js','./daily-life.js','./daily-life.css');
 const assetURLs = new Set(ASSETS.map(path => new URL(path, self.registration.scope).href));
 
