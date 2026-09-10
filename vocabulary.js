@@ -134,6 +134,8 @@
     if(grade==='again') d.stars[current.id]={value:true,updatedAt:now,changeId:changeId()};
     rated=true;save(d);
     root.querySelector('[data-v-action="star"]').textContent=d.stars[current.id]?.value?'★ 已加入生词本':'☆ 加入生词本';
+    // Release focus before hiding rating buttons so an immediate Enter reaches next-word handling.
+    if($('vRating').contains(document.activeElement)) document.activeElement.blur();
     $('vRating').hidden=true;$('vSaved').hidden=false;
     $('vSavedText').textContent=grade==='again'?'已记录：约 10 分钟后复习，并加入生词本。':`已记录：下次复习 ${new Date(d.cards[current.id].due).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}`;
   }
